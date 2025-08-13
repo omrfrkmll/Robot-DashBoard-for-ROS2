@@ -199,7 +199,7 @@ This project is distributed under the MIT License. See the [LICENSE](LICENSE) fi
 
 ## 📞 Contact
 
-Your Name - [Your Email Address]
+ÖMER FARUK - omrfrkmll@gmail.com
 Project Link: [https://github.com/omrfrkmll/Robot-DashBoard-for-ROS2](https://github.com/omrfrkmll/Robot-DashBoard-for-ROS2)
 
 ---
