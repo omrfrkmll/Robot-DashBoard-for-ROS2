@@ -1,6 +1,10 @@
-# 🚀 RobotFlow: ROS2 Control Panel
+# 🚀 RobotFlow: ROS2 Control Panel (UNDER DEVELOPMENT)
 
 The sleek and functional interface of the RobotFlow Control Panel.
+
+---
+
+[RobotFlow Control Panel](images/banner.png)
 
 ---
 
@@ -22,7 +26,7 @@ The sleek and functional interface of the RobotFlow Control Panel.
 
 ## 💡 About
 
-RobotFlow is a modern and interactive web-based control panel designed for differential drive mobile robots developed in the ROS2 Humble environment. It is optimized to run seamlessly on platforms like Jetson Orin Nano. This dashboard provides an intuitive interface for visualizing and managing real-time status data (position, velocity, battery, system resources, etc.) of your robots. Our goal is to offer robot operators a comprehensive overview, accelerating decision-making processes and increasing operational efficiency.
+RobotFlow is a modern and interactive web-based control panel designed for mobile robots developed in the ROS2 environment. It is optimized to run seamlessly on platforms like Jetson Orin Nano. This dashboard provides an intuitive interface for visualizing and managing real-time status data (position, velocity, battery, system resources, etc.) of your robots. Our goal is to offer robot operators a comprehensive overview, accelerating decision-making processes and increasing operational efficiency.
 
 ---
 
@@ -70,7 +74,13 @@ A seamless and optimized experience across all screen sizes, from desktops to ta
 You can add screenshots of your project or a link to a short demo video here.
 
 - Screenshot 1: Main Dashboard View
+
+[Main Dashboard](images/dashboard.png)
+
 - Screenshot 2: Analysis Modal Example
+
+[Analysis Modal](images/analysis_modal.png)
+*Note: The `analysis_modal.png` image is a placeholder and will be added soon.*
 
 ---
 
