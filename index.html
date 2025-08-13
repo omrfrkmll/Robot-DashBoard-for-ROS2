@@ -1,0 +1,3082 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title id="dashboardTitle">RobotFlow Kontrol Paneli</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
+    <!-- Yeni Font: Space Mono (Tüm dashboard için) -->
+    <link rel="preconnect" href="https://fonts.gstatic.com">
+    <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        /* Tüm elemanlar için temel stiller */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        /* CSS Değişkenleri - Tema ve Glassmorphism için */
+        :root {
+            --glass-blur: 25px; /* Artırılmış bulanıklık */
+            --glass-bg-light: rgba(255, 255, 255, 0.1); /* Açık tema cam arka plan */
+            --glass-border-light: rgba(255, 255, 255, 0.1); /* Açık tema cam kenarlık */
+            --glass-shadow-light: rgba(0, 0, 0, 0.25); /* Daha güçlü gölge */
+
+            --text-color-primary: #333; /* Grafik yazıları için varsayılan renk */
+            --grid-color: rgba(0, 0, 0, 0.1); /* Grafik ızgaraları için varsayılan renk */
+
+            /* Scrollbar Renkleri (Açık Tema) */
+            --scrollbar-track-color: rgba(255, 255, 255, 0.15); /* Kaydırma çubuğu izi rengi */
+            --scrollbar-thumb-color: rgba(102, 126, 234, 0.7); /* Açık temada parlayan kaydırma çubuğu rengi */
+            --scrollbar-thumb-hover-color: rgba(102, 126, 234, 1); /* Hover durumunda daha parlak */
+
+            /* Glassmorphism Buton Renkleri (Açık Tema) */
+            --glass-button-bg-light: rgba(255, 255, 255, 0.2);
+            --glass-button-border-light: rgba(255, 255, 255, 0.4);
+            --glass-button-shadow-light: rgba(0, 0, 0, 0.1);
+            --glass-button-text-light: #667eea; /* Açık temada buton metin rengi */
+        }
+
+        /* Koyu Tema için değişkenler */
+        body.dark-theme {
+            --glass-bg-dark: rgba(255, 255, 255, 0.05); /* Koyu tema cam arka plan */
+            --glass-border-dark: rgba(255, 255, 255, 0.05); /* Koyu tema cam kenarlık */
+            --glass-shadow-dark: rgba(0, 0, 0, 0.5); /* Daha güçlü koyu gölge */
+
+            --text-color-primary: #e2e8f0; /* Koyu tema grafik yazıları için renk */
+            --grid-color: rgba(255, 255, 255, 0.1); /* Koyu tema grafik ızgaraları için renk */
+
+            /* Scrollbar Renkleri (Koyu Tema) */
+            --scrollbar-track-color: rgba(15, 23, 42, 0.5); /* Kaydırma çubuğu izi rengi */
+            --scrollbar-thumb-color: rgba(96, 165, 250, 0.7); /* Koyu temada parlayan kaydırma çubuğu rengi */
+            --scrollbar-thumb-hover-color: rgba(96, 165, 250, 1); /* Hover durumunda daha parlak */
+
+            /* Glassmorphism Buton Renkleri (Koyu Tema) */
+            --glass-button-bg-dark: rgba(255, 255, 255, 0.05); /* Ana koyu camdan daha açık */
+            --glass-button-border-dark: rgba(255, 255, 255, 0.1);
+            --glass-button-shadow-dark: rgba(0, 0, 0, 0.3);
+            --glass-button-text-dark: #e2e8f0; /* Koyu temada buton metin rengi */
+        }
+
+        /* Body stilleri, dikey kaydırmaya izin verir */
+        html, body {
+            height: 100%; /* HTML ve body'nin viewport'u doldurmasını sağlar */
+            min-height: 100vh; /* İçeriğin en az tam viewport yüksekliğini kaplamasını sağlar */
+            overflow-x: hidden; /* Yatay kaydırmayı önler */
+            font-family: 'Space Mono', monospace; /* Tüm dashboard için Space Mono fontu uygulandı */
+            color: var(--text-color-primary); /* Metin rengi tema değişkeninden alınır */
+            transition: all 0.5s ease; /* Tema değişiklikleri için yumuşak geçiş */
+        }
+
+        /* Genel Webkit Kaydırma Çubuğu Stilleri */
+        /* Bu stil, tüm kaydırılabilir öğelerdeki Webkit tabanlı kaydırma çubuklarını etkiler */
+        ::-webkit-scrollbar {
+            width: 5px; /* İnce kaydırma çubuğu */
+        }
+        ::-webkit-scrollbar-track {
+            background: var(--scrollbar-track-color); /* Hafif şeffaf iz */
+            border-radius: 10px;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: var(--scrollbar-thumb-color); /* Parlayan tutma yeri */
+            border-radius: 10px;
+            transition: background 0.3s ease; /* Yumuşak parlama geçişi */
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: var(--scrollbar-thumb-hover-color); /* Hover durumunda daha güçlü parlama */
+        }
+
+        /* Firefox Kaydırma Çubuğu Stilleri */
+        /* Bu stil, tüm kaydırılabilir öğelerdeki Firefox tabanlı kaydırma çubuklarını etkiler */
+        @supports (-moz-appearance:none) {
+            html, body, .left-sidebar, .right-sidebar, .camera-grid {
+                scrollbar-width: thin; /* İnce kaydırma çubuğu */
+                scrollbar-color: var(--scrollbar-thumb-color) var(--scrollbar-track-color); /* Tutma yeri sonra iz */
+            }
+        }
+
+
+        /* Açık Tema için Body arka planı (Dairesel Gradyan) */
+        body {
+            background: radial-gradient(circle at 30% 70%, #FFFDF6 0%, #FAF6E9 25%, #DDEB9D 75%, #A0C878 100%);
+        }
+
+        /* Koyu Tema için body arka planı (Dairesel Gradyan) */
+        body.dark-theme {
+            background: radial-gradient(circle at 70% 30%, #222831 0%, #31363F 25%, #76ABAE 75%, #EEEEEE 100%);
+        }
+
+        /* Navigasyon Kartı */
+        .navbar-card {
+            display: flex; /* İçindeki öğelerin hizalanması için */
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.5rem 2rem; /* Kartın iç dolgusu */
+            margin-bottom: 1rem; /* Grid öğeleri arasındaki boşluk */
+            position: relative; /* Diğer öğelerin üzerinde kalması için (isteğe bağlı) */
+            z-index: 1000; 
+            transition: all 0.5s ease;
+            flex-wrap: wrap; /* Küçük ekranlarda sığmazsa alt alta geçmesi için */
+            border-radius: 999px; /* Çok daha fazla yuvarlama - Yarım çember efekti */
+            
+            /* Glassmorphism Efekti */
+            backdrop-filter: blur(var(--glass-blur));
+            -webkit-backdrop-filter: blur(var(--glass-blur));
+            background: var(--glass-bg-light); /* Tekil rgba arka plan */
+            border: 2px solid var(--glass-border-light); /* Doğrudan kenarlık */
+            /*box-shadow: 0 0 80px var(--glass-shadow-light); /* Yeni gölge */
+            color: var(--text-color-primary);
+            /* overflow: hidden; */ /* Navbar'da taşma olmaması için bırakılabilir, ancak butonların gölgesini keser */
+        }
+
+        .dark-theme .navbar-card {
+            background: var(--glass-bg-dark);
+            border: 2px solid var(--glass-border-dark);
+            /*box-shadow: 0 0 80px var(--glass-shadow-dark);*/
+        }
+
+        .logo {
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: #667eea;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            transition: color 0.3s ease;
+            margin-right: auto; /* Logo sola, menü sağa yaslanır */
+        }
+
+        .dark-theme .logo {
+            color: #60a5fa;
+        }
+
+        .nav-menu {
+            display: flex;
+            gap: 2rem;
+            align-items: center;
+            flex-wrap: wrap; /* Nav öğeleri sığmazsa alt satıra geçsin */
+            justify-content: center; /* Ortala */
+            flex-grow: 1; /* Ortadaki boşluğu doldursun */
+        }
+
+        .nav-item {
+            padding: 0.5rem 1rem;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-decoration: none;
+            color: var(--text-color-primary); /* Metin rengi tema değişkeninden alınır */
+        }
+
+        .nav-item:hover, .nav-item.active {
+            background: rgba(102, 126, 234, 0.1);
+            color: #667eea;
+        }
+
+        .dark-theme .nav-item:hover, 
+        .dark-theme .nav-item.active {
+            background: rgba(96, 165, 250, 0.2);
+            color: #60a5fa;
+        }
+
+        .user-profile {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            padding: 0.5rem; /* Menü çubuğuyla aynı dikey padding */
+            border-radius: 999px; /* Yarım çember efekti için artırıldı */
+            background: rgba(102, 126, 234, 0.1);
+            transition: all 0.3s ease;
+            margin-left: auto; /* En sağa yasla */
+        }
+
+        .dark-theme .user-profile {
+            background: rgba(96, 165, 250, 0.2);
+        }
+
+        .avatar {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: linear-gradient(45deg, #667eea, #764ba2);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+            transition: all 0.3s ease;
+        }
+
+        .dark-theme .avatar {
+            background: linear-gradient(45deg, #60a5fa, #3b82f6);
+        }
+
+        .theme-toggle {
+            width: 50px;
+            height: 26px;
+            background: rgba(255, 255, 255, 0.3); /* Açık modda cam efekti */
+            border-radius: 13px;
+            position: relative;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin-left: 1rem;
+            border: 1px solid rgba(255, 255, 255, 0.4); /* Cam efekti kenarlık */
+            outline: none;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1) inset; /* İç gölge */
+        }
+
+        .theme-toggle::after {
+            content: '☀️'; /* Açık tema için güneş ikonu */
+            position: absolute;
+            width: 22px;
+            height: 22px;
+            border-radius: 50%;
+            background: white;
+            top: 2px;
+            left: 2px;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        }
+
+        .dark-theme .theme-toggle::after {
+            content: '🌙'; /* Koyu tema için ay ikonu */
+            transform: translateX(24px); /* Toggle dairesini sağa hareket ettirir */
+            background: #1f2937;
+        }
+
+        /* Kullanıcı Profili Dil Seçici */
+        .language-select {
+            padding: 0.4rem 0.8rem;
+            border: 1px solid var(--glass-button-border-light);
+            border-radius: 8px;
+            background: var(--glass-button-bg-light);
+            color: var(--glass-button-text-light);
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+            font-size: 0.9rem;
+            -webkit-appearance: none; /* Varsayılan select stilini kaldırır */
+            -moz-appearance: none;
+            appearance: none;
+            /*background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23667eea' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E"); /* Özel ok */
+            background-repeat: no-repeat;
+            background-position: right 0.8rem center;
+            background-size: 1.2rem;
+            margin-left: 1rem; /* Tema geçişinden biraz uzaklaştır */
+        }
+
+        .dark-theme .language-select {
+            background: var(--glass-button-bg-dark);
+            border: 1px solid var(--glass-button-border-dark);
+            color: var(--glass-button-text-dark);
+            /*background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23e2e8f0' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");*/
+        }
+
+        .language-select:hover {
+            background: rgba(102, 126, 234, 0.3);
+        }
+
+        .dark-theme .language-select:hover {
+            background: rgba(96, 165, 250, 0.4);
+        }
+
+        /* Hamburger Menü İkonu */
+        .hamburger-icon {
+            display: none; /* Varsayılan olarak gizli (masaüstü için) */
+            font-size: 2rem;
+            cursor: pointer;
+            color: var(--text-color-primary);
+            transition: color 0.3s ease;
+            z-index: 1001; /* Diğer navbar öğelerinin üzerinde */
+        }
+
+        /* Mobil Menü Katmanı */
+        .mobile-menu-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.9); /* Koyu yarı saydam arka plan */
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            z-index: 2000; /* Tüm içeriğin üzerinde */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            transform: translateX(100%); /* Başlangıçta ekran dışı */
+            transition: transform 0.3s ease-in-out;
+            opacity: 0; /* Başlangıçta gizli */
+            visibility: hidden; /* Clickable olmasını engelle */
+        }
+
+        .mobile-menu-overlay.show {
+            transform: translateX(0); /* Görüntülemek için içeri kaydır */
+            opacity: 1; /* Görünür yap */
+            visibility: visible; /* Clickable yap */
+        }
+
+        .mobile-menu-content {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 2rem;
+            padding: 2rem;
+            width: 80%; /* Mobil menü içeriğinin genişliği */
+            max-width: 400px;
+            background: var(--glass-bg-light); /* Temayla uyumlu arka plan */
+            border-radius: 25px;
+            border: 2px solid var(--glass-border-light);
+            box-shadow: 0 0 80px var(--glass-shadow-light);
+            color: var(--text-color-primary);
+        }
+
+        .dark-theme .mobile-menu-content {
+            background: var(--glass-bg-dark);
+            border: 2px solid var(--glass-border-dark);
+            box-shadow: 0 0 80px var(--glass-shadow-dark);
+        }
+
+        /* Mobil menü içindeki nav ve user profile stilleri */
+        .mobile-menu-content .nav-menu,
+        .mobile-menu-content .user-profile {
+            flex-direction: column; /* Mobil menüde dikey yığılma */
+            width: 100%;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .mobile-menu-content .nav-item {
+            width: 100%;
+            text-align: center;
+            font-size: 1.2rem;
+            padding: 1rem;
+        }
+
+        .mobile-menu-content .user-profile {
+            margin-top: 2rem;
+            padding: 1rem;
+            border-radius: 15px;
+            background: rgba(102, 126, 234, 0.2); /* Farklı bir arka plan */
+            justify-content: center;
+        }
+
+        .dark-theme .mobile-menu-content .user-profile {
+            background: rgba(96, 165, 250, 0.3);
+        }
+
+        .mobile-menu-content .avatar {
+            width: 60px;
+            height: 60px;
+            font-size: 1.8rem;
+        }
+
+        .mobile-menu-content .language-select,
+        .mobile-menu-content .theme-toggle {
+            margin: 1rem auto; /* Ortala */
+        }
+
+        /* Kapatma butonu */
+        .close-mobile-menu {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            font-size: 2.5rem;
+            color: white;
+            cursor: pointer;
+            z-index: 2001; /* Kapatma düğmesinin her şeyin üzerinde olduğundan emin olun */
+        }
+
+        .close-mobile-menu:hover {
+            color: #ef4444;
+        }
+
+
+        /* Ana Düzen Konteyneri */
+        .main-container {
+            display: grid;
+            /* Yüksekliği belirlemek için 1fr kullanıyoruz */
+            grid-template-columns: 300px 2fr 1.2fr; /* Sol Kenar Çubuğu | Harita | Sağ Kenar Çubuğu */
+            grid-template-rows: auto 1fr auto; /* Navbar | İçerik (kenar çubukları/harita) | Kamera */
+            grid-template-areas:
+                "navbar-area    navbar-area     navbar-area"
+                "sidebar-left   main-map        sidebar-right"
+                "camera-section camera-section  camera-section"; /* Kamera tüm sütunlara yayılır */
+            gap: 0.75rem; /* Kartlar arasındaki boşluk azaltıldı */
+            padding: 1rem;
+            height: 100vh; /* Ana konteynerin tüm viewport yüksekliğini almasını sağlar */
+            overflow-y: auto; /* Ana içerik alanı için dikey kaydırmaya izin verir */
+            overflow-x: hidden; /* Ana içerikte yatay kaydırmayı önler */
+        }
+        
+        /* Navbar'ın grid alanına atanması */
+        .navbar-card {
+            grid-area: navbar-area;
+        }
+
+        /* Tüm glassmorphism panelleri için temel stil */
+        .glass-panel {
+            backdrop-filter: blur(var(--glass-blur));
+            -webkit-backdrop-filter: blur(var(--glass-blur));
+            background: var(--glass-bg-light); /* Tekil rgba arka plan */
+            border: 2px solid var(--glass-border-light); /* Doğrudan kenarlık */
+            color: var(--text-color-primary); /* Metin rengi tema değişkeninden alınır */
+            border-radius: 25px; /* Köşe yuvarlama tutarlı hale getirildi */
+            /*box-shadow: 0 0 80px var(--glass-shadow-light); /* Yeni gölge */
+            position: relative; /* Diğer öğelerin üzerinde kalması için */
+            overflow: hidden; /* Kenarlıkların taşmasını engelle */
+            transition: all 0.5s ease; /* Tema ve diğer geçişler için */
+            padding: 1.5rem; /* Panellerin iç dolgusu */
+        }
+        
+        /* Kenar çubuğu ve harita konteynerleri için ortak stiller */
+        .left-sidebar, .map-container, .camera-container {
+            /* Bu sınıflar artık glass-panel'den görsel stilleri devralıyor */
+            transition: all 0.5s ease;
+            position: relative; 
+        }
+
+        /* Sol Kenar Çubuğu - Robot Listesi */
+        .left-sidebar {
+            grid-area: sidebar-left; /* Grid alanına ata */
+            height: 100%; /* Bulunduğu grid satırının tüm yüksekliğini alır */
+            overflow-y: auto; /* Robot listesi için kaydırmaya izin verir */
+            overscroll-behavior-y: contain; /* Kaydırma bittiğinde elemanın sıkışmasını sağlar */
+            padding: 1.5rem; /* Tutarlı padding */
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between; /* İçerik bölümlerini dikeyde yayar */
+            align-items: stretch; /* İçerik öğelerinin genişliği doldurmasını sağlar */
+            min-height: 300px; /* Minimum yükseklik, içeriğin kısa olduğu durumlarda */
+        }
+
+        /* Robot listesini ve başlığını kapsayan flex öğesi */
+        .sidebar-robot-list-section {
+            display: flex;
+            flex-direction: column;
+            flex-grow: 1; /* Mevcut alanı doldurmasını sağlar */
+            justify-content: center; /* Dikeyde ortalamaya çalışır */
+            margin-bottom: 1rem; /* Hızlı işlemlerden ayırma */
+        }
+
+        /* Hızlı işlemler kısmı, otomatik olarak dibe itilir */
+        .quick-actions-section {
+            margin-top: auto; /* Bu öğeyi en alta iter */
+        }
+
+        .sidebar-title-container { /* Başlık ve butonları aynı satırda tutmak için yeni kapsayıcı */
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem;
+        }
+
+        .sidebar-title {
+            font-size: 1.2rem;
+            font-weight: 600;
+            color: var(--text-color-primary); /* Metin rengi tema değişkeninden alınır */
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            transition: color 0.3s ease;
+            margin-right: auto; /* Butonların sağa yaslanmasını sağlar */
+        }
+
+        /* Quick actions bölümündeki başlık için üst boşluk */
+        .quick-actions-section .sidebar-title {
+            margin-top: 2rem; 
+            margin-bottom: 1rem;
+        }
+
+        /* Sol kenar çubuğu butonları için glassmorphism */
+        .sidebar-action-btn {
+            background: var(--glass-button-bg-light);
+            border: 1px solid var(--glass-button-border-light);
+            /* box-shadow: 0 4px 10px var(--glass-button-shadow-light); */
+            backdrop-filter: blur(10px); /* Daha az bulanıklık */
+            -webkit-backdrop-filter: blur(10px);
+            font-size: 1.2rem;
+            cursor: pointer;
+            color: var(--glass-button-text-light); /* Temaya göre metin rengi */
+            transition: all 0.3s ease;
+            padding: 0.2rem; /* Tıklama alanı için */
+            border-radius: 5px;
+            margin-left:5px;
+            margin-right:5px;
+        }
+
+        .dark-theme .sidebar-action-btn {
+            background: var(--glass-button-bg-dark);
+            border: 1px solid var(--glass-button-border-dark);
+            /* box-shadow: 0 4px 10px var(--glass-button-shadow-dark); */
+            color: var(--glass-button-text-dark); /* Koyu temada metin rengi beyaz */
+        }
+
+        .sidebar-action-btn:hover {
+            background: rgba(102, 126, 234, 0.3); /* Hover'da daha opak */
+            transform: scale(1.1);
+        }
+        .dark-theme .sidebar-action-btn:hover {
+            background: rgba(96, 165, 250, 0.4); /* Dark temada hover'da daha opak */
+        }
+
+        .robot-item {
+            padding: 1rem;
+            margin-bottom: 0.5rem;
+            background: rgba(255, 255, 255, 0.4); /* Cam efekti arka plan */
+            border-radius: 12px;
+            border: 1px solid rgba(255, 255, 255, 0.6); /* Cam efekti kenarlık */
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+            width: 100%; /* Ekran genişliğine adaptif olması için tam genişlik */
+        }
+
+        .dark-theme .robot-item {
+            background: rgba(51, 65, 85, 0.7);
+            box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .robot-item:hover, .robot-item.active {
+            border-color: #667eea;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.2);
+        }
+
+        .dark-theme .robot-item:hover, 
+        .dark-theme .robot-item.active {
+            border-color: #60a5fa;
+            box-shadow: 0 4px 15px rgba(96, 165, 250, 0.3);
+        }
+
+        .robot-name {
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+            transition: color 0.3s ease;
+            font-size: clamp(1rem, 2.5vw, 1.1rem); /* İçeriğin adaptif olması için font boyutu responsive olabilir */
+        }
+
+        .dark-theme .robot-name {
+            color: #f1f5f9;
+        }
+
+        .robot-status {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: clamp(0.8rem, 2vw, 0.9rem); /* İçeriğin adaptif olması için font boyutu responsive olabilir */
+            color: var(--text-color-primary); /* Metin rengi tema değişkeninden alınır */
+            transition: color 0.3s ease;
+        }
+
+        .status-indicator {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #22c55e;
+        }
+
+        .status-indicator.offline {
+            background: #ef4444;
+        }
+
+        .status-indicator.warning {
+            background: #f59e0b;
+        }
+
+        /* Merkez Alan - Harita */
+        .map-container {
+            grid-area: main-map; /* Grid alanına ata */
+            height: 100%; /* Bulunduğu grid satırının tüm yüksekliğini alır */
+            position: relative;
+            overflow: hidden;
+            flex-grow: 1; /* Haritanın yığılmış düzende kullanılabilir alanı kaplamasını sağlar */
+        }
+
+        .map-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem;
+            flex-wrap: wrap; /* Küçük ekranlarda sığmazsa alt alta geçmesi için */
+        }
+
+        .map-title {
+            font-size: clamp(1.1rem, 2.5vw, 1.3rem); /* İçeriğin adaptif olması için font boyutu responsive olabilir */
+            font-weight: 600;
+            color: var(--text-color-primary); /* Metin rengi tema değişkeninden alınır */
+            transition: color 0.3s ease;
+        }
+
+        .map-controls {
+            display: flex;
+            gap: 0.5rem;
+            flex-wrap: wrap; /* Küçük ekranlarda sığmazsa alt alta geçmesi için */
+        }
+
+        /* Harita ve Hızlı İşlem butonları için glassmorphism */
+        .control-btn {
+            padding: 0.5rem 1rem;
+            border: 1px solid var(--glass-button-border-light);
+            border-radius: 8px;
+            background: var(--glass-button-bg-light);
+            color: var(--glass-button-text-light); /* Temaya göre metin rengi */
+            cursor: pointer;
+            transition: all 0.3s ease;
+            /* box-shadow: 0 4px 10px var(--glass-button-shadow-light); */
+            backdrop-filter: blur(10px); /* Daha az bulanıklık */
+            -webkit-backdrop-filter: blur(10px);
+        }
+
+        .dark-theme .control-btn {
+            background: var(--glass-button-bg-dark);
+            border: 1px solid var(--glass-button-border-dark);
+            /* box-shadow: 0 4px 10px var(--glass-button-shadow-dark); */
+            color: var(--glass-button-text-dark); /* Koyu temada metin rengi beyaz */
+        }
+
+        .control-btn:hover {
+            background: rgba(102, 126, 234, 0.3); /* Hover'da daha opak */
+            transform: translateY(-1px);
+        }
+
+        .dark-theme .control-btn:hover {
+            background: rgba(96, 165, 250, 0.4); /* Dark temada hover'da daha opak */
+        }
+
+        .map-canvas {
+            width: 100%;
+            height: calc(100% - 60px); /* Başlığa göre yüksekliği ayarlar */
+            background: rgba(255, 255, 255, 0.3); /* Cam efekti arka plan */
+            border-radius: 12px;
+            position: relative;
+            overflow: hidden;
+            border: 1px solid rgba(255, 255, 255, 0.6); /* Cam efekti kenarlık */
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+        }
+
+        .dark-theme .map-canvas {
+            background: rgba(15, 23, 42, 0.7);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .robot-map-svg {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 1; /* Robot markerların altında kalmalı */
+        }
+
+        .svg-grid-bg {
+            fill: url(#smallGrid);
+            transition: all 0.3s ease;
+        }
+
+        .dark-theme .svg-grid-bg {
+            fill: url(#darkGrid);
+        }
+
+        /* Kamera Akışı Konteyneri */
+        .camera-container {
+            grid-area: camera-section; /* Grid alanına ata */
+            min-height: 300px;
+            height: auto;
+            max-height: 400px; /* İçerik kısa ise yığılmış görünümde yüksekliği sınırlar */
+            overflow: hidden; /* Dahili kamera ızgarasının taşmasını yönetir */
+            width: 100%; /* Ekran genişliğine adaptif olması için tam genişlik */
+        }
+
+        .camera-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem;
+            flex-wrap: wrap; /* Küçük ekranlarda sığmazsa alt alta geçmesi için */
+        }
+
+        .camera-title {
+            font-size: 1.2rem;
+            font-weight: 600;
+            color: var(--text-color-primary); /* Metin rengi tema değişkeninden alınır */
+            transition: color 0.3s ease;
+        }
+
+        .camera-controls {
+            display: flex;
+            gap: 0.5rem;
+            align-items: center;
+            flex-wrap: wrap; /* Küçük ekranlarda sığmazsa alt alta geçmesi için */
+        }
+
+        .camera-select {
+            padding: 0.5rem;
+            border: 1px solid rgba(255, 255, 255, 0.6); /* Cam efekti kenarlık */
+            border-radius: 8px;
+            background: rgba(255, 255, 255, 0.4); /* Cam efekti arka plan */
+            color: var(--text-color-primary); /* Metin rengi tema değişkeninden alınır */
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+            /* İçeriğin adaptif olması için font boyutu responsive olabilir */
+            font-size: clamp(0.8rem, 2vw, 0.9rem); /* Minimum, viewport'a göre, maksimum değer */
+        }
+
+        .dark-theme .camera-select {
+            background: rgba(51, 65, 85, 0.7);
+            border-color: rgba(255, 255, 255, 0.1);
+        }
+
+        .camera-btn {
+            padding: 0.5rem 1rem;
+            border: none;
+            border-radius: 8px;
+            background: #667eea;
+            color: white;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-size: 0.9rem;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.1); /* Buton gölgesi */
+        }
+
+        .dark-theme .camera-btn {
+            background: #60a5fa;
+        }
+
+        .camera-btn:hover {
+            background: #5a6fd8;
+            transform: translateY(-1px);
+        }
+
+        .dark-theme .camera-btn:hover {
+            background: #3b82f6;
+        }
+
+        .camera-grid {
+            display: grid;
+            /* Kamera akışları için uyarlanabilir ızgara */
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); 
+            gap: 1rem;
+            height: calc(100% - 60px); /* Başlığa göre yüksekliği ayarlar */
+            min-height: 200px;
+            overflow-y: auto; /* Çok sayıda akış varsa kamera ızgarası içinde kaydırmaya izin verir */
+        }
+
+        .camera-stream {
+            background: rgba(255, 255, 255, 0.3); /* Açık modda daha transparan */
+            border-radius: 12px;
+            overflow: hidden;
+            position: relative;
+            border: 1px solid rgba(255, 255, 255, 0.6); /* Cam efekti kenarlık */
+            transition: all 0.3s ease;
+            height: 100%; /* Izgaradaki kullanılabilir yüksekliği doldurur */
+            min-height: 180px; /* Her akış için minimum yükseklik */
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.05); /* Daha hafif gölge */
+        }
+
+        .dark-theme .camera-stream {
+            background: rgba(15, 23, 42, 0.7);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .camera-stream:hover {
+            border-color: #667eea;
+        }
+
+        .dark-theme .camera-stream:hover {
+            border-color: #60a5fa;
+        }
+
+        .camera-stream.active {
+            border-color: #f59e0b;
+            box-shadow: 0 4px 15px rgba(245, 158, 11, 0.3);
+        }
+
+        .stream-header {
+            background: rgba(0, 0, 0, 0.6); /* Daha transparan */
+            color: white;
+            padding: 0.5rem 1rem;
+            font-size: 0.9rem;
+            font-weight: 500;
+            position: absolute; /* .camera-stream'a göre konumlandırılmış */
+            top: 0;
+            left: 0;
+            right: 0;
+            z-index: 10;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .stream-status {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .stream-indicator {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #ef4444; /* Kırmızı (etkin değil) */
+            animation: pulse 2s infinite;
+        }
+
+        .stream-indicator.live {
+            background: #22c55e; /* Yeşil (canlı) */
+        }
+
+        .stream-video {
+            width: 100%;
+            flex-grow: 1; /* Videonun kalan alanı doldurmasını sağlar */
+            object-fit: cover;
+            background: #1f2937;
+            display: block; /* Videonun altındaki fazla boşluğu kaldırır */
+        }
+
+        .stream-placeholder {
+            width: 100%;
+            flex-grow: 1; /* Yer tutucunun kalan alanı doldurmasını sağlar */
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            color: var(--text-color-primary); /* Metin rengi tema değişkeninden alınır */
+            font-size: clamp(0.7rem, 1.5vw, 0.9rem); /* İçeriğin adaptif olması için font boyutu responsive olabilir */
+            background: repeating-linear-gradient(
+                45deg,
+                transparent,
+                transparent 10px,
+                rgba(0,0,0,0.03) 10px, /* Daha hafif çizgi */
+                rgba(0,0,0,0.03) 20px
+            );
+        }
+
+        .dark-theme .stream-placeholder {
+            background: repeating-linear-gradient(
+                45deg,
+                transparent,
+                transparent 10px,
+                rgba(255,255,255,0.05) 10px,
+                rgba(255,255,255,0.05) 20px
+            );
+        }
+
+        .stream-overlay {
+            position: absolute;
+            bottom: 10px;
+            right: 10px;
+            background: rgba(0, 0, 0, 0.6); /* Daha transparan */
+            color: white;
+            padding: 0.5rem;
+            border-radius: 8px;
+            font-size: clamp(0.6rem, 1.2vw, 0.8rem); /* İçeriğin adaptif olması için font boyutu responsive olabilir */
+        }
+
+        .snapshot-btn, .fullscreen-btn {
+            background: rgba(0, 0, 0, 0.5); /* Daha transparan */
+            backdrop-filter: blur(5px); /* Hafif bulanıklık */
+            border: 1px solid rgba(255, 255, 255, 0.3); /* Cam efekti kenarlık */
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        
+        .snapshot-btn:hover, .fullscreen-btn:hover {
+            background: rgba(0, 0, 0, 0.7);
+        }
+
+        /* Fullscreen modal */
+        .fullscreen-modal {
+            position: fixed; /* Daha iyi görüntü için sabitleştirildi */
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: rgba(0, 0, 0, 0.95);
+            z-index: 9999;
+            display: none;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .fullscreen-modal.show {
+            display: flex;
+        }
+
+        .fullscreen-video {
+            max-width: 90vw;
+            max-height: 90vh;
+            border-radius: 12px;
+        }
+
+        .close-fullscreen {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+            border: none;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            cursor: pointer;
+            font-size: 1.5rem;
+            transition: all 0.3s ease;
+        }
+
+        .close-fullscreen:hover {
+            background: rgba(255, 255, 255, 0.3);
+            transform: scale(1.1);
+        }
+
+        /* Sağ Kenar Çubuğu - Durum Kartları */
+        .right-sidebar {
+            grid-area: sidebar-right; /* Grid alanına ata */
+            height: 100%; /* Bulunduğu grid satırının tüm yüksekliğini alır */
+            display: flex;
+            flex-direction: column; /* Kartları dikey olarak yığar */
+            gap: 1rem;
+            /*overflow-y: auto; /* Kartlar için kaydırmaya izin verir */
+            overscroll-behavior-y: contain; /* Kaydırma bittiğinde elemanın sıkışmasını sağlar */
+            min-width: 300px; /* Esnek olsa bile minimum genişlik sağlar */
+            width: 100%; /* Ekran genişliğine adaptif olması için tam genişlik */
+        }
+            
+        .status-card {
+            min-height: 120px; /* Kartların minimum yüksekliğe sahip olmasına izin verir */
+            user-select: none; /* Sürükleme sırasında metin seçimini önler */
+            width: 100%; /* Ekran genişliğine adaptif olması için tam genişlik */
+            display: flex; /* İçeriğin düzenlenmesi için flexbox */
+            flex-direction: column; /* İçeriği dikey olarak hizala */
+            justify-content: space-between; /* İçeriği dikeyde eşit dağıt */
+            padding: 1.5rem; /* İç dolgu */
+            transition: all 0.5s ease; /* Tema ve diğer geçişler için */
+            
+            /* Glassmorphism Efekti - Sadece bu kartlara özgü */
+            backdrop-filter: blur(var(--glass-blur));
+            -webkit-backdrop-filter: blur(var(--glass-blur));
+            background: var(--glass-bg-light); /* Tekil rgba arka plan */
+            border: 2px solid var(--glass-border-light); /* Doğrudan kenarlık */
+            /*box-shadow: 0 0 80px var(--glass-shadow-light); /* Yeni gölge */
+            color: var(--text-color-primary);
+            border-radius: 25px; /* Köşe yuvarlama artırıldı */
+            position: relative;
+            overflow: hidden;
+            cursor: grab; /* Sadece sürüklemek istenen öğelerde imleç */
+        }
+        
+        /* Sürüklenebilir kartlar için hover efekti */
+        .right-sidebar .status-card:hover {
+            transform: translateY(-2px);
+        }
+        .dark-theme .right-sidebar .status-card:hover { 
+            /* box-shadow kaldırıldı, bu kartlarda zaten yok */
+        }
+
+        /* Sürüklenen öğe için stil (hayalet görüntü) */
+        .status-card.dragging {
+            opacity: 0.5; /* Sürüklü öğeyi yarı saydam yapar */
+            border: 2px dashed #667eea; /* Görsel geri bildirim için kesik çizgi kenarlık */
+        }
+
+        .card-header {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            margin-bottom: 1rem;
+        }
+
+        .card-icon {
+            width: 40px;
+            height: 40px;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.2rem;
+        }
+
+        .battery-icon {
+            background: linear-gradient(45deg, #22c55e, #16a34a);
+            color: white;
+        }
+
+        .location-icon {
+            background: linear-gradient(45deg, #3b82f6, #1d4ed8);
+            color: white;
+        }
+
+        .speed-icon {
+            background: linear-gradient(45deg, #f59e0b, #d97706);
+            color: white;
+        }
+
+        .temp-icon {
+            background: linear-gradient(45deg, #ef4444, #dc2626);
+            color: white;
+        }
+
+        .card-title {
+            font-weight: 600;
+            color: var(--text-color-primary); /* Metin rengi tema değişkeninden alınır */
+            transition: color 0.3s ease;
+            font-size: clamp(1rem, 2.5vw, 1.1rem); /* İçeriğin adaptif olması için font boyutu responsive olabilir */
+        }
+
+        .card-value {
+            font-size: clamp(1.5rem, 4vw, 1.8rem); /* İçeriğin adaptif olması için font boyutu responsive olabilir */
+            font-weight: bold;
+            color: #667eea;
+            margin: 0.5rem 0;
+            transition: color 0.3s ease;
+        }
+
+        .dark-theme .card-value {
+            color: #60a5fa;
+        }
+
+        .card-details {
+            display: flex;
+            justify-content: space-between;
+            font-size: clamp(0.7rem, 1.8vw, 0.9rem); /* İçeriğin adaptif olması için font boyutu responsive olabilir */
+            color: var(--text-color-primary); /* Metin rengi tema değişkeninden alınır */
+            transition: color 0.3s ease;
+            flex-wrap: wrap; /* Küçük ekranlarda sığmazsa alt alta geçmesi için */
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 8px;
+            background: rgba(255, 255, 255, 0.4); /* Cam efekti arka plan */
+            border-radius: 4px;
+            margin: 0.5rem 0;
+            overflow: hidden;
+            transition: background 0.3s ease;
+            border: 1px solid rgba(255, 255, 255, 0.6); /* Cam efekti kenarlık */
+        }
+
+        .dark-theme .progress-bar {
+            background: rgba(55, 65, 81, 0.7);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #22c55e, #16a34a);
+            transition: width 0.3s ease;
+        }
+
+        /* Chart container for status cards */
+        .status-card .chart-container {
+            width: 100%; /* Grafiğin kartın tam genişliğini kaplaması için */
+            height: 80px; /* Grafiğin yüksekliği */
+            margin-top: 1rem;
+            position: relative; /* Canvas'ın içindeki içeriğin position: absolute kullanması için */
+        }
+
+        /* Chart.js canvas'ını esnek hale getir */
+        .status-card canvas {
+            max-width: 100%;
+            height: 100% !important; /* Chart.js inline height ekleyebilir, bu onu geçersiz kılar */
+            width: 100% !important;
+            min-height: 0; /* Gerekirse küçülmeye izin ver */
+        }
+
+        /* Responsive Tasarım */
+        @media (max-width: 1200px) {
+            .main-container {
+                /* Biraz daha küçük masaüstleri için sütunları ayarlar */
+                grid-template-columns: 250px 2fr 1.5fr; 
+            }
+        }
+
+        @media (max-width: 1000px) { /* Tablet ve daha küçük ekranlar için */
+            .main-container {
+                /* Tablet ve daha küçük masaüstü: yığılmış düzen */
+                grid-template-columns: 1fr; /* Tek sütun */
+                grid-template-rows: auto; /* Yükseklik içeriğe göre ayarlanır */
+                grid-template-areas:
+                    "navbar-area" /* Navbar da yığılmış düzene dahil */
+                    "sidebar-left"
+                    "main-map"
+                    "sidebar-right"
+                    "camera-section"; /* Tüm elemanlar dikey olarak yığılır */
+                height: auto;
+                min-height: 100vh;
+                display: flex;
+                flex-direction: column; /* Elemanları dikey olarak yığar */
+                gap: 0.75rem; /* Kartlar arasındaki boşluk tutarlı hale getirildi */
+                overflow-y: auto; /* Kaydırmanın etkinleştirildiğinden emin olur */
+            }
+            
+            /* Masaüstü menüsünü ve kullanıcı profilini gizle */
+            .nav-menu, .user-profile {
+                display: none; 
+            }
+            /* Hamburger ikonunu göster */
+            .hamburger-icon {
+                display: block; 
+                margin-left: auto; /* İkonu sağa yasla */
+            }
+            .navbar-card {
+                justify-content: space-between; /* Logo ve hamburger arasında boşluk */
+                flex-wrap: nowrap; /* Artık öğelerin sarılmasına izin verme */
+            }
+
+            /* Daha iyi tablet akışı için elemanları sıralar */
+            .navbar-card { order: 0; margin-bottom: 0.75rem;} /* Navbar en üstte */
+            .left-sidebar { order: 1; min-height: 200px; max-height: 300px; }
+            .map-container { order: 2; min-height: 400px; height: 50vh; }
+            .right-sidebar { order: 3; display: flex; flex-direction: column; gap: 0.75rem; }
+            .camera-container { order: 4; /* Kameranın en altta olmasını sağlar */
+                max-height: none; /* Yığılmış görünümde maksimum yükseklik yok */
+                height: auto; /* İçeriğe yüksekliği uyarlar */
+                min-height: 350px;
+            }
+
+            .camera-grid {
+                /* Tabletler için kamera ızgarasını ayarlar */
+                grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+                min-height: 250px;
+                height: auto;
+            }
+
+            .camera-stream {
+                height: 250px; /* Tablette bireysel akışlar için makul bir yükseklik ayarlar */
+            }
+
+            /* Sağ kenar çubuğundaki durum kartları, yeterli alan varsa tablet üzerinde bir ızgara olabilir */
+            .right-sidebar > .status-card {
+                /* Sütun içinde esnek olduklarından emin olun */
+                width: 100%;
+                margin-bottom: 0; /* Sürükle ve bırak'tan gelen ekstra kenar boşluğunu kaldırır */
+            }
+
+            /* Durum kartlarının tablet üzerinde sağ kenar çubuğunda bir ızgara olmasını isterseniz: */
+            .right-sidebar.grid-on-tablet { /* Ekran boyutu gerektiriyorsa bu sınıfı JS'de ekleyin */
+                display: grid;
+                grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+                gap: 0.75rem;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .main-container {
+                gap: 0.5rem;
+                padding: 0.5rem;
+            }
+            
+            .left-sidebar {
+                min-height: 150px;
+                max-height: 200px;
+            }
+
+            .map-container {
+                min-height: 300px;
+                height: 40vh;
+            }
+
+            .camera-container {
+                padding: 1rem;
+                min-height: 400px;
+            }
+
+            .camera-grid {
+                grid-template-columns: 1fr; /* Daha küçük tabletlerde kamera akışları için tek sütun */
+                gap: 0.5rem;
+                min-height: 300px;
+            }
+
+            .camera-stream {
+                height: 200px;
+                min-height: 180px;
+            }
+
+            .right-sidebar {
+                grid-template-columns: 1fr; /* Küçük tabletlerde/telefonlarda durum kartlarını dikey olarak yığar */
+                gap: 0.5rem;
+            }
+
+            .status-card {
+                padding: 1rem;
+                min-height: 100px;
+            }
+
+            .camera-controls {
+                flex-wrap: wrap;
+                gap: 0.25rem;
+            }
+
+            .camera-btn {
+                font-size: 0.8rem;
+                padding: 0.4rem 0.8rem;
+            }
+
+            .camera-select {
+                font-size: 0.9rem;
+            }
+
+            /* Mobil özel iyileştirmeler */
+            .stream-header {
+                font-size: 0.8rem;
+                padding: 0.4rem 0.8rem;
+            }
+
+            .stream-overlay {
+                font-size: 0.7rem;
+                padding: 0.3rem 0.5rem;
+            }
+
+            .snapshot-btn, .fullscreen-btn {
+                width: 35px;
+                height: 35px;
+                font-size: 1rem;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .main-container {
+                padding: 0.25rem;
+                gap: 0.25rem;
+            }
+
+            .navbar-card {
+                padding: 0.5rem 1rem;
+                flex-direction: row; /* Mobil görünümde hala yanyana */
+                align-items: center;
+                gap: 0.5rem;
+            }
+            .navbar-card .logo {
+                margin-right: auto; /* Logo sola */
+            }
+            .hamburger-icon {
+                margin-left: 0; /* Hamburger ikonunu olduğu yerde tut */
+            }
+            /* Hamburger menü açıkken de bu stiller etkili olmalı */
+            .mobile-menu-content .nav-menu {
+                gap: 0.5rem;
+            }
+            .mobile-menu-content .nav-item {
+                font-size: 1.1rem;
+                padding: 0.8rem;
+            }
+            .mobile-menu-content .user-profile {
+                margin-top: 1.5rem;
+                padding: 0.8rem;
+            }
+            .mobile-menu-content .avatar {
+                width: 50px;
+                height: 50px;
+                font-size: 1.5rem;
+            }
+            .mobile-menu-content .language-select,
+            .mobile-menu-content .theme-toggle {
+                margin: 0.8rem auto;
+            }
+
+
+            .camera-container {
+                padding: 0.75rem;
+                min-height: 350px;
+            }
+
+            .camera-header {
+                flex-direction: column;
+                gap: 0.5rem;
+                align-items: stretch;
+            }
+
+            .camera-controls {
+                justify-content: center;
+            }
+
+            .camera-grid {
+                min-height: 250px;
+            }
+
+            .camera-stream {
+                height: 180px;
+                min-height: 160px;
+            }
+
+            .left-sidebar, .map-container, .camera-container, .status-card {
+                border-radius: 10px;
+            }
+        }
+
+        /* Animasyonlar */
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .pulse {
+            animation: pulse 2s infinite;
+        }
+
+        .notification {
+            position: fixed; /* Daha iyi görüntü için sabitleştirildi */
+            top: 100px;
+            right: 20px;
+            background: white;
+            padding: 1rem;
+            border-radius: 12px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.2);
+            transform: translateX(400px);
+            transition: transform 0.3s ease;
+            z-index: 2000; /* Bildirimin diğer öğelerin üstünde olmasını sağlar */
+            min-width: 250px;
+        }
+
+        .notification.show {
+            transform: translateX(0);
+        }
+
+        /* Yeni Modal Stilleri - Robot Analizi için */
+        .analysis-modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.7);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 3000;
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.3s ease, visibility 0.3s ease;
+        }
+
+        .analysis-modal-overlay.show {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        .analysis-modal-content {
+            background: white;
+            padding: 2rem;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+            width: 90%;
+            max-width: 600px;
+            max-height: 80vh;
+            overflow-y: auto;
+            position: relative;
+            transform: translateY(-20px);
+            opacity: 0;
+            transition: transform 0.3s ease, opacity 0.3s ease;
+            color: #333; /* Darker text for readability */
+        }
+
+        .dark-theme .analysis-modal-content {
+            background: #1f2937;
+            color: #e2e8f0;
+        }
+
+        .analysis-modal-overlay.show .analysis-modal-content {
+            transform: translateY(0);
+            opacity: 1;
+        }
+
+        .analysis-modal-close-btn {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: none;
+            border: none;
+            font-size: 1.5rem;
+            cursor: pointer;
+            color: #667eea;
+            transition: color 0.2s ease;
+        }
+
+        .dark-theme .analysis-modal-close-btn {
+            color: #60a5fa;
+        }
+
+        .analysis-modal-close-btn:hover {
+            color: #dc2626;
+        }
+
+        .analysis-modal-title {
+            font-size: 1.8rem;
+            font-weight: bold;
+            margin-bottom: 1.5rem;
+            color: #667eea;
+        }
+
+        .dark-theme .analysis-modal-title {
+            color: #60a5fa;
+        }
+
+        .analysis-modal-body {
+            line-height: 1.6;
+            white-space: pre-wrap; /* Satır sonlarını koru */
+        }
+
+        .analysis-loading-spinner {
+            border: 4px solid rgba(0, 0, 0, 0.1);
+            border-top: 4px solid #667eea;
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            animation: spin 1s linear infinite;
+            margin: 20px auto;
+            display: none; /* Varsayılan olarak gizli */
+        }
+
+        .dark-theme .analysis-loading-spinner {
+            border-top: 4px solid #60a5fa;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <!-- Ana Konteyner -->
+    <div class="main-container">
+        <!-- Üst Navigasyon - Şimdi bir Kart! -->
+        <div class="navbar-card">
+            <div class="logo">
+                <span>🤖</span>
+                RobotFlow
+            </div>
+            <!-- Hamburger menü ikonu -->
+            <div class="hamburger-icon" id="hamburgerIcon" onclick="toggleMobileMenu()">☰</div>
+
+            <!-- Mobil menü kapsayıcısı -->
+            <div class="mobile-menu-overlay" id="mobileMenuOverlay">
+                <div class="close-mobile-menu" onclick="toggleMobileMenu()">✖</div>
+                <div class="mobile-menu-content">
+                    <div class="nav-menu">
+                        <a href="#" class="nav-item active" data-lang-key="navDashboard">Dashboard</a>
+                        <a href="#" class="nav-item" data-lang-key="navMaps">Haritalar</a>
+                        <a href="#" class="nav-item" data-lang-key="navAnalytics">Analizler</a>
+                        <a href="#" class="nav-item" data-lang-key="navSettings">Ayarlar</a>
+                    </div>
+                    <div class="user-profile">
+                        <div class="avatar">AU</div>
+                        <div>
+                            <div style="font-weight: 600;">Admin User</div>
+                            <div style="font-size: 0.8rem; color: #6b7280;">admin@robotflow.com</div>
+                        </div>
+                        <select class="language-select" id="languageSelect" onchange="switchLanguage(this.value)">
+                            <option value="en">English</option>
+                            <option value="tr">Türkçe</option>
+                        </select>
+                        <button class="theme-toggle" onclick="toggleTheme()"></button>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="nav-menu">
+                <a href="#" class="nav-item active" data-lang-key="navDashboard">Dashboard</a>
+                <a href="#" class="nav-item" data-lang-key="navMaps">Haritalar</a>
+                <a href="#" class="nav-item" data-lang-key="navAnalytics">Analizler</a>
+                <a href="#" class="nav-item" data-lang-key="navSettings">Ayarlar</a>
+            </div>
+            <div class="user-profile">
+                <div class="avatar">AU</div>
+                <div>
+                    <div style="font-weight: 600;">Admin User</div>
+                    <div style="font-size: 0.8rem; color: #6b7280;">admin@robotflow.com</div>
+                </div>
+                <select class="language-select" id="languageSelect" onchange="switchLanguage(this.value)">
+                    <option value="en">English</option>
+                    <option value="tr">Türkçe</option>
+                </select>
+                <button class="theme-toggle" onclick="toggleTheme()"></button>
+            </div>
+        </div>
+
+        <!-- Sol Kenar Çubuğu - Robot Listesi -->
+        <div class="left-sidebar glass-panel">
+            <div class="sidebar-robot-list-section"> <!-- Robot listesi ve başlık için yeni kapsayıcı -->
+                <div class="sidebar-title-container">
+                    <div class="sidebar-title" data-lang-key="activeRobotsTitle">
+                        <span>🤖</span>
+                        Aktif Robotlar
+                    </div>
+                    <button class="sidebar-action-btn" id="addRobotBtn" onclick="addRobot()" data-lang-key="addRobotBtn" title="Yeni Robot Ekle">➕</button>
+                    
+                    <button class="sidebar-action-btn" id="deleteRobotBtn" onclick="deleteSelectedRobot()" data-lang-key="deleteRobotBtn" title="Seçili Robotu Sil">➖</button>
+                </div>
+                
+                <div id="robotListContainer">
+                    <!-- Robot öğeleri JavaScript tarafından dinamik olarak yüklenecek -->
+                </div>
+            </div>
+
+            <div class="quick-actions-section"> <!-- Hızlı İşlemler kısmı kartın en altına gelecek -->
+                <div class="sidebar-title" data-lang-key="quickActionsTitle">
+                    <span>⚙️</span>
+                    Hızlı İşlemler
+                </div>
+                <button class="control-btn" style="width: 100%; margin-bottom: 0.5rem;" data-lang-key="goHomeBtn">🏠 Hepsini Eve Gönder</button>
+                <button class="control-btn" style="width: 100%; margin-bottom: 0.5rem;" data-lang-key="emergencyStopBtn">⏸️ Acil Durdurma</button>
+                <button class="control-btn" style="width: 100%;" data-lang-key="refreshStatusBtn">🔄 Durumu Yenile</button>
+                <button class="control-btn" style="width: 100%; margin-top: 1rem;" onclick="analyzeRobotStatus()" data-lang-key="analyzeStatusBtn">✨ Robot Durumu Analizi</button>
+            </div>
+        </div>
+
+        <!-- Merkez - Harita Konteyneri -->
+        <div class="map-container glass-panel">
+            <div class="map-header">
+                <div class="map-title" data-lang-key="liveMapTitle">🗺️ Canlı Harita Görünümü</div>
+                <div class="map-controls">
+                    <button class="control-btn" data-lang-key="centerBtn">📍 Merkezle</button>
+                    <button class="control-btn" data-lang-key="zoomInBtn">🔍 Yakınlaştır</button>
+                    <button class="control-btn" data-lang-key="zoomOutBtn">🔎 Uzaklaştır</button>
+                    <button class="control-btn" data-lang-key="followRobotBtn">🎯 Robotu Takip Et</button>
+                </div>
+            </div>
+            
+            <div class="map-canvas" id="mapCanvas">
+                <svg width="100%" height="100%" viewBox="0 0 800 600" preserveAspectRatio="xMidYMid meet" class="robot-map-svg">
+                    <defs>
+                        <!-- Izgara desenleri -->
+                        <pattern id="smallGrid" width="20" height="20" patternUnits="userSpaceOnUse">
+                            <path d="M 20 0 L 0 0 0 20" fill="none" stroke="rgba(255,255,255,0.2)" stroke-width="0.5"/>
+                        </pattern>
+                        <pattern id="darkGrid" width="20" height="20" patternUnits="userSpaceOnUse">
+                            <path d="M 20 0 L 0 0 0 20" fill="none" stroke="rgba(55, 65, 81, 0.5)" stroke-width="0.5"/>
+                        </pattern>
+                        <!-- Ok başı işaretçisi -->
+                        <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="0" refY="3.5" orient="auto">
+                            <polygon points="0 0, 10 3.5, 0 7" fill="#667eea" />
+                        </marker>
+                    </defs>
+
+                    <!-- Arka plan ızgara çizgileri -->
+                    <rect width="100%" height="100%" class="svg-grid-bg"/>
+
+                    <!-- Robot Yolları (dinamik yollar için yer tutucu) -->
+                    <path id="robotPath1" d="M100 100 C 200 0, 300 200, 400 100 S 600 0, 700 100" fill="none" stroke="#22c55e" stroke-width="3" stroke-dasharray="10 5" marker-end="url(#arrowhead)"/>
+                    <path id="robotPath2" d="M150 500 Q 300 400 450 500 T 700 400" fill="none" stroke="#60a5fa" stroke-width="3" stroke-dasharray="5 5" marker-end="url(#arrowhead)"/>
+
+                    <!-- Engeller/Duvarlar -->
+                    <rect x="50" y="250" width="100" height="80" rx="10" ry="10" fill="rgba(255,255,255,0.3)" stroke="rgba(255,255,255,0.5)" stroke-width="1"/>
+                    <circle cx="650" cy="200" r="40" fill="rgba(255,255,255,0.3)" stroke="rgba(255,255,255,0.5)" stroke-width="1"/>
+                    <polygon points="300,400 350,300 400,400 350,500" fill="rgba(255,255,255,0.3)" stroke="rgba(255,255,255,0.5)" stroke-width="1"/>
+
+                    <!-- Şarj İstasyonları -->
+                    <rect x="700" y="50" width="80" height="40" rx="5" ry="5" fill="#f59e0b" stroke="#d97706" stroke-width="2"/>
+                    <text x="740" y="75" text-anchor="middle" font-size="20" fill="white">⚡</text>
+                </svg>
+                <!-- Robot İşaretçileri - Konumları JS ile ayarlanacak -->
+                <!-- Robot markerların harita üzerinde görünmesi için z-index 2 verildi -->
+                <!-- JavaScript tarafından dinamik olarak yüklenecek -->
+            </div>
+        </div>
+
+        <!-- Sağ Kenar Çubuğu - Durum Kartları -->
+        <div class="right-sidebar" id="rightSidebar">
+            <!-- Batarya Kartı -->
+            <div class="status-card" draggable="true" id="card-battery">
+                <div class="card-header">
+                    <div class="card-icon battery-icon">🔋</div>
+                    <div class="card-title" data-lang-key="batteryStatusTitle">Batarya Durumu</div>
+                </div>
+                <div class="card-value" id="batteryLevel">87%</div>
+                <div class="progress-bar">
+                    <div class="progress-fill" style="width: 87%;" id="batteryProgress"></div>
+                </div>
+                <div class="card-details">
+                    <span data-lang-key="voltageLabel">Voltaj: <span id="voltage">24.3V</span></span>
+                    <span data-lang-key="currentLabel">Akım: <span id="current">-2.1A</span></span>
+                </div>
+                <div class="chart-container">
+                    <canvas id="batteryChart"></canvas>
+                </div>
+            </div>
+
+            <!-- Konum Kartı -->
+            <div class="status-card" draggable="true" id="card-location">
+                <div class="card-header">
+                    <div class="card-icon location-icon">📍</div>
+                    <div class="card-title" data-lang-key="locationTitle">Konum</div>
+                </div>
+                <div class="card-details" style="margin-bottom: 1rem;">
+                    <div data-lang-key="xLabel">X: <span id="posX">12.34</span>m</div>
+                    <div data-lang-key="yLabel">Y: <span id="posY">-5.67</span>m</div>
+                    <div data-lang-key="thetaLabel">θ: <span id="posTheta">45.2°</span></div>
+                </div>
+            </div>
+
+            <!-- Hız Kartı -->
+            <div class="status-card" draggable="true" id="card-speed">
+                <div class="card-header">
+                    <div class="card-icon speed-icon">🚀</div>
+                    <div class="card-title" data-lang-key="speedTitle">Hız</div>
+                </div>
+                <div class="card-value" id="linearSpeed">1.2 m/s</div>
+                <div class="card-details">
+                    <span data-lang-key="linearLabel">Doğrusal: <span id="linearVel">1.2</span> m/s</span>
+                    <span data-lang-key="angularLabel">Açısal: <span id="angularVel">0.3</span> rad/s</span>
+                </div>
+            </div>
+
+            <!-- Sıcaklık Kartı -->
+            <div class="status-card" draggable="true" id="card-temperature">
+                <div class="card-header">
+                    <div class="card-icon temp-icon">🌡️</div>
+                    <div class="card-title" data-lang-key="temperatureTitle">Sıcaklık</div>
+                </div>
+                <div class="card-value" id="temperature">42°C</div>
+                <div class="card-details">
+                    <span data-lang-key="cpuTempLabel">CPU: <span id="cpuTemp">38°C</span></span>
+                    <span data-lang-key="gpuTempLabel">GPU: <span id="gpuTemp">45°C</span></span>
+                </div>
+            </div>
+
+            <!-- Sistem Durumu Kartı -->
+            <div class="status-card" draggable="true" id="card-system">
+                <div class="card-header">
+                    <div class="card-icon" style="background: linear-gradient(45deg, #8b5cf6, #7c3aed); color: white;">💻</div>
+                    <div class="card-title" data-lang-key="systemStatusTitle">Sistem Durumu</div>
+                </div>
+                <div class="card-details" style="flex-direction: column; gap: 0.5rem;">
+                    <div style="display: flex; justify-content: space-between;">
+                        <span data-lang-key="cpuUsageLabel">CPU Kullanımı:</span>
+                        <span id="cpuUsage">23%</span>
+                    </div>
+                    <div style="display: flex; justify-content: space-between;">
+                        <span data-lang-key="memoryLabel">Bellek:</span>
+                        <span id="memUsage">2.1/8.0 GB</span>
+                    </div>
+                    <div style="display: flex; justify-content: space-between;">
+                        <span id="uptimeLabel" data-lang-key="uptimeLabel">Çalışma Süresi:</span>
+                        <span id="uptime">2sa 34dk</span>
+                    </div>
+                </div>
+                <div class="chart-container">
+                    <canvas id="cpuUsageChart"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- Kamera Akışı Konteyneri (haritanın altında ayrı bir alan) -->
+        <div class="camera-container glass-panel">
+            <div class="camera-header">
+                <div class="camera-title" data-lang-key="cameraStreamsTitle">📹 Kamera Akışları</div>
+                <div class="camera-controls">
+                    <select class="camera-select" id="cameraLayout">
+                        <option value="grid" data-lang-key="gridLayout">Izgara Görünümü</option>
+                        <option value="single" data-lang-key="singleLayout">Tekli Görünüm</option>
+                        <option value="pip" data-lang-key="pipLayout">Resim İçinde Resim</option>
+                    </select>
+                    <button class="camera-btn" onclick="toggleRecording()">
+                        <span id="recordBtn" data-lang-key="recordBtn">🔴 Kaydet</span>
+                    </button>
+                    <button class="camera-btn" onclick="takeSnapshot()" data-lang-key="snapshotBtn">📸 Anlık Görüntü</button>
+                    <button class="camera-btn" onclick="refreshStreams()" data-lang-key="refreshStreamsBtn">🔄 Yenile</button>
+                </div>
+            </div>
+            
+            <div class="camera-grid" id="cameraGrid">
+                <!-- Ön Kamera -->
+                <div class="camera-stream active" data-camera="front">
+                    <div class="stream-header">
+                        <div>
+                            <span data-lang-key="frontCamTitle">Ön Kamera</span>
+                            <div class="stream-status">
+                                <div class="stream-indicator live"></div>
+                                <span data-lang-key="liveStatus">CANLI</span>
+                            </div>
+                        </div>
+                        <span>1920x1080 • 30fps</span>
+                    </div>
+                    <video class="stream-video" autoplay muted playsinline>
+                        <source src="#" type="video/webm">
+                    </video>
+                    <div class="stream-placeholder">
+                        <div style="font-size: 3rem; margin-bottom: 1rem;">📹</div>
+                        <div data-lang-key="frontCamPlaceholder">Ön Kamera Akışı</div>
+                        <div style="font-size: 0.8rem; margin-top: 0.5rem;" data-lang-key="connectingStatus">Bağlanılıyor...</div>
+                    </div>
+                    <button class="snapshot-btn" onclick="takeSnapshot('front')">📸</button>
+                    <button class="fullscreen-btn" onclick="openFullscreen('front')">⛶</button>
+                    <div class="stream-overlay">
+                        <span data-lang-key="fpsLabel">FPS: <span id="fps-front">30</span></span>
+                        <span data-lang-key="qualityLabel">Kalite: <span id="quality-front">HD</span></span>
+                    </div>
+                </div>
+
+                <!-- Arka Kamera -->
+                <div class="camera-stream" data-camera="rear">
+                    <div class="stream-header">
+                        <div>
+                            <span data-lang-key="rearCamTitle">Arka Kamera</span>
+                            <div class="stream-status">
+                                <div class="stream-indicator live"></div>
+                                <span data-lang-key="liveStatus">CANLI</span>
+                            </div>
+                        </div>
+                        <span>1280x720 • 24fps</span>
+                    </div>
+                    <video class="stream-video" autoplay muted playsinline>
+                        <source src="#" type="video/webm">
+                    </video>
+                    <div class="stream-placeholder">
+                        <div style="font-size: 3rem; margin-bottom: 1rem;">📹</div>
+                        <div data-lang-key="rearCamPlaceholder">Arka Kamera Akışı</div>
+                        <div style="font-size: 0.8rem; margin-top: 0.5rem;" data-lang-key="connectingStatus">Bağlanıyor...</div>
+                    </div>
+                    <button class="snapshot-btn" onclick="takeSnapshot('rear')">📸</button>
+                    <button class="fullscreen-btn" onclick="openFullscreen('rear')">⛶</button>
+                    <div class="stream-overlay">
+                        <span data-lang-key="fpsLabel">FPS: <span id="fps-rear">24</span></span>
+                        <span data-lang-key="qualityLabel">Kalite: <span id="quality-rear">720p</span></span>
+                    </div>
+                </div>
+
+                <!-- Yan Kamera -->
+                <div class="camera-stream" data-camera="side">
+                    <div class="stream-header">
+                        <div>
+                            <span data-lang-key="sideCamTitle">Yan Kamera</span>
+                            <div class="stream-status">
+                                <div class="stream-indicator"></div>
+                                <span data-lang-key="offlineStatus">ÇEVRİMDİDIŞI</span>
+                            </div>
+                        </div>
+                        <span>640x480 • 15fps</span>
+                    </div>
+                    <video class="stream-video" autoplay muted playsinline>
+                        <source src="#" type="video/webm">
+                    </video>
+                    <div class="stream-placeholder">
+                        <div style="font-size: 3rem; margin-bottom: 1rem;">📹</div>
+                        <div data-lang-key="sideCamPlaceholder">Yan Kamera Akışı</div>
+                        <div style="font-size: 0.8rem; margin-top: 0.5rem;" data-lang-key="camOfflineStatus">Kamera Çevrimdışı</div>
+                    </div>
+                    <button class="snapshot-btn" onclick="takeSnapshot('side')">📸</button>
+                    <button class="fullscreen-btn" onclick="openFullscreen('side')">⛶</button>
+                    <div class="stream-overlay">
+                        <span data-lang-key="fpsLabel">FPS: <span id="fps-side">0</span></span>
+                        <span data-lang-key="qualityLabel">Kalite: <span id="quality-side">--</span></span>
+                    </div>
+                </div>
+
+                <!-- Derinlik Kamerası -->
+                <div class="camera-stream" data-camera="depth">
+                    <div class="stream-header">
+                        <div>
+                            <span data-lang-key="depthCamTitle">Derinlik Kamerası</span>
+                            <div class="stream-status">
+                                <div class="stream-indicator live"></div>
+                                <span data-lang-key="liveStatus">CANLI</span>
+                            </div>
+                        </div>
+                        <span>640x480 • 30fps</span>
+                    </div>
+                    <video class="stream-video" autoplay muted playsinline>
+                        <source src="#" type="video/webm">
+                    </video>
+                    <div class="stream-placeholder">
+                        <div style="font-size: 3rem; margin-bottom: 1rem;">🎭</div>
+                        <div data-lang-key="depthCamPlaceholder">Derinlik Kamera Akışı</div>
+                        <div style="font-size: 0.8rem; margin-top: 0.5rem;" data-lang-key="depthProcessingStatus">Derinlik verisi işleniyor...</div>
+                    </div>
+                    <button class="snapshot-btn" onclick="takeSnapshot('depth')">📸</button>
+                    <button class="fullscreen-btn" onclick="openFullscreen('depth')">⛶</button>
+                    <div class="stream-overlay">
+                        <span data-lang-key="fpsLabel">FPS: <span id="fps-depth">30</span></span>
+                        <span data-lang-key="rangeLabel">Menzil: <span id="range-depth">0.3-10m</span></span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tam Ekran Modalı -->
+    <div class="fullscreen-modal" id="fullscreenModal">
+        <video class="fullscreen-video" id="fullscreenVideo" autoplay muted playsinline></video>
+        <button class="close-fullscreen" onclick="closeFullscreen()">×</button>
+    </div>
+
+    <!-- Robot Durumu Analiz Modalı -->
+    <div class="analysis-modal-overlay" id="analysisModalOverlay">
+        <div class="analysis-modal-content">
+            <button class="analysis-modal-close-btn" onclick="closeAnalysisModal()">×</button>
+            <h2 class="analysis-modal-title" data-lang-key="analysisModalTitle">✨ Robot Durumu Analizi</h2>
+            <div class="analysis-loading-spinner" id="analysisSpinner"></div>
+            <div class="analysis-modal-body" id="analysisResult">
+                <!-- Analiz sonucu buraya yüklenecek -->
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Kamera Akışı Yönetimi
+        let isRecording = false;
+        let activeCamera = 'front';
+        let streams = {
+            front: { active: true, fps: 30, quality: 'HD' },
+            rear: { active: true, fps: 24, quality: '720p', streamUrl: 'https://example.com/rear_stream.webm' },
+            side: { active: false, fps: 0, quality: '--' },
+            depth: { active: true, fps: 30, quality: 'Depth' }
+        };
+
+        // Dil Yönetimi İçin Çeviriler
+        const translations = {
+            en: {
+                dashboardTitle: 'RobotFlow Dashboard',
+                navDashboard: 'Dashboard',
+                navMaps: 'Maps',
+                navAnalytics: 'Analytics',
+                navSettings: 'Settings',
+                activeRobotsTitle: 'Active Robots',
+                addRobotBtn: 'Add New Robot',
+                deleteRobotBtn: 'Delete Selected Robot',
+                quickActionsTitle: 'Quick Actions',
+                goHomeBtn: '🏠 Send All Home',
+                emergencyStopBtn: '⏸️ Emergency Stop',
+                refreshStatusBtn: '🔄 Refresh Status',
+                analyzeStatusBtn: '✨ Analyze Robot Status',
+                onlineStatus: 'Online • Autonomous',
+                warningStatus: 'Warning • Low Battery',
+                offlineStatus: 'Offline • Maintenance',
+                liveMapTitle: '🗺️ Live Map View',
+                centerBtn: '📍 Center',
+                zoomInBtn: '🔍 Zoom In',
+                zoomOutBtn: '🔎 Zoom Out',
+                followRobotBtn: '🎯 Follow Robot',
+                batteryStatusTitle: 'Battery Status',
+                voltageLabel: 'Voltage:',
+                currentLabel: 'Current:',
+                locationTitle: 'Location',
+                xLabel: 'X:',
+                yLabel: 'Y:',
+                thetaLabel: 'θ:',
+                speedTitle: 'Speed',
+                linearLabel: 'Linear:',
+                angularLabel: 'Angular:',
+                temperatureTitle: 'Temperature',
+                cpuTempLabel: 'CPU:',
+                gpuTempLabel: 'GPU:',
+                systemStatusTitle: 'System Status',
+                cpuUsageLabel: 'CPU Usage:',
+                memoryLabel: 'Memory:',
+                uptimeLabel: 'Uptime:',
+                cameraStreamsTitle: '📹 Camera Streams',
+                gridLayout: 'Grid View',
+                singleLayout: 'Single View',
+                pipLayout: 'Picture-in-Picture',
+                recordBtn: '🔴 Record',
+                stopRecordBtn: '⏹️ Stop',
+                snapshotBtn: '📸 Snapshot',
+                refreshStreamsBtn: '🔄 Refresh',
+                frontCamTitle: 'Front Camera',
+                rearCamTitle: 'Rear Camera',
+                sideCamTitle: 'Side Camera',
+                depthCamTitle: 'Depth Camera',
+                liveStatus: 'LIVE',
+                offlineStatus: 'OFFLINE',
+                connectingStatus: 'Connecting...',
+                camOfflineStatus: 'Camera Offline',
+                depthProcessingStatus: 'Processing depth data...',
+                fpsLabel: 'FPS:',
+                qualityLabel: 'Quality:',
+                rangeLabel: 'Range:',
+                notificationSnapshot: (camera) => `Snapshot taken from ${camera} camera`,
+                notificationRecordingStarted: 'Recording started',
+                notificationRecordingStopped: 'Recording stopped',
+                notificationRefreshStreams: 'Refreshing camera streams...',
+                notificationFullscreen: (camera) => `Fullscreen: ${camera} camera`,
+                notificationNoRobotToDelete: 'No robot to delete.',
+                notificationRobotAdded: (name) => `'${name}' robot added.`,
+                notificationRobotDeleted: (name) => `'${name}' robot deleted.`,
+                notificationLayoutChanged: (layout) => `Layout changed to ${layout} view`,
+                notificationNoRobotForAnalysis: 'Please select a robot to analyze.',
+                analysisModalTitle: '✨ Robot Status Analysis',
+                analysisErrorApi: 'Could not get analysis. Please try again later.',
+                analysisErrorNetwork: 'An error occurred during analysis. Please check your network connection or try again.',
+                onlineDotStatus: 'Online • Autonomous',
+                warningDotStatus: 'Warning • Low Battery',
+                offlineDotStatus: 'Offline • Maintenance',
+            },
+            tr: {
+                dashboardTitle: 'RobotFlow Kontrol Paneli',
+                navDashboard: 'Kontrol Paneli',
+                navMaps: 'Haritalar',
+                navAnalytics: 'Analizler',
+                navSettings: 'Ayarlar',
+                activeRobotsTitle: 'Aktif Robotlar',
+                addRobotBtn: 'Yeni Robot Ekle',
+                deleteRobotBtn: 'Seçili Robotu Sil',
+                quickActionsTitle: 'Hızlı İşlemler',
+                goHomeBtn: '🏠 Hepsini Eve Gönder',
+                emergencyStopBtn: '⏸️ Acil Durdurma',
+                refreshStatusBtn: '🔄 Durumu Yenile',
+                analyzeStatusBtn: '✨ Robot Durumu Analizi',
+                onlineStatus: 'Çevrimiçi • Otonom',
+                warningStatus: 'Uyarı • Düşük Batarya',
+                offlineStatus: 'Çevrimdışı • Bakım',
+                liveMapTitle: '🗺️ Canlı Harita Görünümü',
+                centerBtn: '📍 Merkezle',
+                zoomInBtn: '🔍 Yakınlaştır',
+                zoomOutBtn: '🔎 Uzaklaştır',
+                followRobotBtn: '🎯 Robotu Takip Et',
+                batteryStatusTitle: 'Batarya Durumu',
+                voltageLabel: 'Voltaj:',
+                currentLabel: 'Akım:',
+                locationTitle: 'Konum',
+                xLabel: 'X:',
+                yLabel: 'Y:',
+                thetaLabel: 'θ:',
+                speedTitle: 'Hız',
+                linearLabel: 'Doğrusal:',
+                angularLabel: 'Açısal:',
+                temperatureTitle: 'Sıcaklık',
+                cpuTempLabel: 'CPU:',
+                gpuTempLabel: 'GPU:',
+                systemStatusTitle: 'Sistem Durumu',
+                cpuUsageLabel: 'CPU Kullanımı:',
+                memoryLabel: 'Bellek:',
+                uptimeLabel: 'Çalışma Süresi:',
+                cameraStreamsTitle: '📹 Kamera Akışları',
+                gridLayout: 'Izgara Görünümü',
+                singleLayout: 'Tekli Görünüm',
+                pipLayout: 'Resim İçinde Resim',
+                recordBtn: '🔴 Kaydet',
+                stopRecordBtn: '⏹️ Durdur',
+                snapshotBtn: '📸 Anlık Görüntü',
+                refreshStreamsBtn: '🔄 Yenile',
+                frontCamTitle: 'Ön Kamera',
+                rearCamTitle: 'Arka Kamera',
+                sideCamTitle: 'Yan Kamera',
+                depthCamTitle: 'Derinlik Kamerası',
+                liveStatus: 'CANLI',
+                offlineStatus: 'ÇEVRİMDİDIŞI',
+                connectingStatus: 'Bağlanıyor...',
+                camOfflineStatus: 'Kamera Çevrimdışı',
+                depthProcessingStatus: 'Derinlik verisi işleniyor...',
+                fpsLabel: 'FPS:',
+                qualityLabel: 'Kalite:',
+                rangeLabel: 'Menzil:',
+                notificationSnapshot: (camera) => `${camera} kamerasından anlık görüntü alındı`,
+                notificationRecordingStarted: 'Kayıt başlatıldı',
+                notificationRecordingStopped: 'Kayıt durduruldu',
+                notificationRefreshStreams: 'Kamera akışları yenileniyor...',
+                notificationFullscreen: (camera) => `Tam Ekran: ${camera} kamera`,
+                notificationNoRobotToDelete: 'Silinecek robot yok.',
+                notificationRobotAdded: (name) => `'${name}' robotu eklendi.`,
+                notificationRobotDeleted: (name) => `'${name}' robotu silindi.`,
+                notificationLayoutChanged: (layout) => `Düzen ${layout} görünümüne değiştirildi`,
+                notificationNoRobotForAnalysis: 'Lütfen analiz edilecek bir robot seçin.',
+                analysisModalTitle: '✨ Robot Durumu Analizi',
+                analysisErrorApi: 'Analiz alınamadı. Lütfen daha sonra tekrar deneyin.',
+                analysisErrorNetwork: 'Analiz sırasında bir hata oluştu. Lütfen ağ bağlantınızı kontrol edin veya tekrar deneyin.',
+                onlineDotStatus: 'Çevrimiçi • Otonom',
+                warningDotStatus: 'Uyarı • Düşük Batarya',
+                offlineDotStatus: 'Çevrimdışı • Bakım',
+            }
+        };
+
+        let currentLanguage = 'tr'; // Varsayılan dil Türkçe
+
+        /**
+         * Belirtilen dile geçiş yapar ve tüm UI metinlerini günceller.
+         * Seçilen dili yerel depolamaya kaydeder.
+         * @param {string} langCode - Geçilecek dilin kodu (örn. 'en', 'tr').
+         */
+        function switchLanguage(langCode) {
+            currentLanguage = langCode;
+            localStorage.setItem('language', langCode);
+            applyTranslations();
+            updateRobotList(); // Robot listesi durum metinleri için yeniden çizilmeli
+            updateChartThemes(); // Chart etiketleri için grafikler güncellenmeli
+        }
+
+        /**
+         * HTML içinde `data-lang-key` özniteliğine sahip tüm öğelerin metin içeriğini
+         * mevcut dile göre günceller.
+         */
+        function applyTranslations() {
+            // Dashboard başlığını güncelle
+            const dashboardTitleElement = document.getElementById('dashboardTitle');
+            if (dashboardTitleElement) {
+                dashboardTitleElement.textContent = translations[currentLanguage].dashboardTitle;
+            }
+            
+            // data-lang-key özniteliğine sahip tüm öğeleri güncelle
+            document.querySelectorAll('[data-lang-key]').forEach(element => {
+                const key = element.getAttribute('data-lang-key');
+                if (translations[currentLanguage] && translations[currentLanguage][key]) {
+                    // Özellikle `addRobotBtn` ve `deleteRobotBtn` için `title` özniteliğini güncelle
+                    if (key === 'addRobotBtn' || key === 'deleteRobotBtn') {
+                        if (element.tagName === 'BUTTON') { // Sadece button elementleri için title güncelle
+                            element.title = translations[currentLanguage][key];
+                        }
+                        // TextContent'i de güncellemek gerekiyorsa:
+                        // element.textContent = translations[currentLanguage][key]; 
+                    } else if (key === 'recordBtn') { // Kaydet/Durdur butonu için özel durum
+                         const recordBtnElement = document.getElementById('recordBtn');
+                         if (recordBtnElement) {
+                             if (isRecording) {
+                                 recordBtnElement.textContent = translations[currentLanguage].stopRecordBtn;
+                             } else {
+                                 recordBtnElement.textContent = translations[currentLanguage].recordBtn;
+                             }
+                         }
+                    }
+                    else {
+                        element.textContent = translations[currentLanguage][key];
+                    }
+                }
+            });
+
+
+            // Select option'larını güncelle
+            document.querySelectorAll('#cameraLayout option').forEach(option => {
+                const key = option.getAttribute('data-lang-key');
+                if (translations[currentLanguage] && translations[currentLanguage][key]) {
+                    option.textContent = translations[currentLanguage][key];
+                }
+            });
+
+            // Record/Stop butonu metnini güncelleyin
+            // Bu kısım yukarıdaki genel döngüye taşındı, ancak doğrudan erişim için hala kullanılabilir.
+            // const recordBtnElement = document.getElementById('recordBtn');
+            // if (recordBtnElement) {
+            //     if (isRecording) {
+            //         recordBtnElement.textContent = translations[currentLanguage].stopRecordBtn;
+            //     } else {
+            //         recordBtnElement.textContent = translations[currentLanguage].recordBtn;
+            //     }
+            // }
+
+            // Kamera placeholder metinlerini güncelle
+            const cameraPlaceholders = [
+                { id: 'frontCamPlaceholder', statusId: 'connectingStatus' },
+                { id: 'rearCamPlaceholder', statusId: 'connectingStatus' },
+                { id: 'sideCamPlaceholder', statusId: 'camOfflineStatus' },
+                { id: 'depthCamPlaceholder', statusId: 'depthProcessingStatus' }
+            ];
+
+            document.querySelectorAll('.camera-stream').forEach((stream, index) => {
+                const placeholderDiv = stream.querySelector('.stream-placeholder');
+                if (placeholderDiv) {
+                    const mainTextDiv = placeholderDiv.children[1]; // İkinci çocuk ana metin
+                    const statusTextDiv = placeholderDiv.children[2]; // Üçüncü çocuk durum metni
+
+                    if (mainTextDiv) {
+                        const camTitleKey = `${stream.dataset.camera}CamPlaceholder`;
+                        mainTextDiv.textContent = translations[currentLanguage][camTitleKey];
+                    }
+                    if (statusTextDiv) {
+                        const statusKey = cameraPlaceholders[index].statusId;
+                        statusTextDiv.textContent = translations[currentLanguage][statusKey];
+                    }
+                }
+            });
+        }
+
+
+        /**
+         * Temayı yerel depolama veya sistem tercihine göre başlatır.
+         * Ayrıca dil ayarını da başlatır.
+         */
+        function initSettings() {
+            // Tema başlangıcı
+            const savedTheme = localStorage.getItem('theme');
+            const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+            if (savedTheme === 'dark' || (!savedTheme && prefersDark)) {
+                document.body.classList.add('dark-theme');
+            }
+
+            // Dil başlangıcı
+            const savedLang = localStorage.getItem('language');
+            const browserLang = navigator.language.split('-')[0]; // Sadece 'en' veya 'tr' gibi ana dili al
+            let initialLang = 'en'; // Varsayılan olarak İngilizce
+
+            if (savedLang && translations[savedLang]) {
+                initialLang = savedLang;
+            } else if (translations[browserLang]) {
+                initialLang = browserLang;
+            }
+
+            currentLanguage = initialLang;
+            const langSelect = document.getElementById('languageSelect');
+            if (langSelect) { // langSelect'in var olup olmadığını kontrol et
+                langSelect.value = initialLang;
+            }
+            applyTranslations(); // Uygulamayı başlatırken çevirileri uygula
+            updateChartThemes(); // Grafik temalarını ayarla
+        }
+
+        /**
+         * Kayıt durumunu değiştirir ve UI'yı buna göre günceller.
+         * Kayıt durumu değişikliği hakkında bir bildirim gösterir.
+         */
+        function toggleRecording() {
+            isRecording = !isRecording;
+            const btn = document.getElementById('recordBtn');
+            if (btn) { // Null kontrolü eklendi
+                if (isRecording) {
+                    btn.textContent = translations[currentLanguage].stopRecordBtn;
+                    btn.parentElement.style.background = '#ef4444';
+                    showNotification(translations[currentLanguage].notificationRecordingStarted, 'success');
+                } else {
+                    btn.textContent = translations[currentLanguage].recordBtn;
+                    btn.parentElement.style.background = '#667eea';
+                    showNotification(translations[currentLanguage].notificationRecordingStopped, 'info');
+                }
+            }
+        }
+
+        /**
+         * Belirtilen kameradan veya aktif kameradan anlık görüntü alır.
+         * Kamera öğesi üzerinde bir flaş efekti simüle eder ve bir mesaj kaydeder.
+         * @param {string} [camera=null] - Anlık görüntü alınacak kameranın ID'si (örn. 'front', 'rear').
+         * Null ise, şu an aktif olan kameradan anlık görüntü alınır.
+         */
+        function takeSnapshot(camera = null) {
+            const targetCamera = camera || activeCamera;
+            showNotification(translations[currentLanguage].notificationSnapshot(targetCamera), 'success');
+            
+            // Kamera öğesi üzerinde flaş efekti simüle et
+            const cameraElement = document.querySelector(`[data-camera="${targetCamera}"]`);
+            if (cameraElement) {
+                cameraElement.style.filter = 'brightness(2)';
+                setTimeout(() => {
+                    cameraElement.style.filter = '';
+                }, 200);
+            }
+            
+            console.log(`Anlık görüntü alındı: ${targetCamera}_${Date.now()}.jpg`);
+        }
+
+        /**
+         * Tüm kamera akışlarını yeniler.
+         * Yeniden bağlanma sürecini simüle eder ve yer tutucuları günceller.
+         */
+        function refreshStreams() {
+            showNotification(translations[currentLanguage].notificationRefreshStreams, 'info');
+            
+            // Yeniden bağlanma mesajını göstererek akış yenilemeyi simüle et
+            document.querySelectorAll('.stream-placeholder').forEach(placeholder => {
+                if (placeholder) { // Null kontrolü eklendi
+                    placeholder.innerHTML = `
+                        <div style="font-size: 3rem; margin-bottom: 1rem;">🔄</div>
+                        <div>${translations[currentLanguage].connectingStatus}</div>
+                    `;
+                }
+            });
+            
+            // Bir gecikmeden sonra orijinal yer tutucu mesajlarına geri dön
+            setTimeout(() => {
+                applyTranslations(); // Yer tutucu metinlerini orijinal haline getir
+            }, 2000);
+        }
+
+        /**
+         * Belirtilen kamera akışı için tam ekran modalını açar.
+         * Gerçek bir uygulamada, bu, gerçek video akışını yükleyecektir.
+         * @param {string} camera - Tam ekranda görüntülenecek kamera akışının ID'si.
+         */
+        function openFullscreen(camera) {
+            activeCamera = camera;
+            const modal = document.getElementById('fullscreenModal');
+            const video = document.getElementById('fullscreenVideo');
+            
+            if (modal) { // Null kontrolü eklendi
+                // Gerçek bir uygulamada, video kaynağını burada ayarlarsınız:
+                // video.src = streams[camera].streamUrl || '';
+                
+                modal.classList.add('show');
+                showNotification(translations[currentLanguage].notificationFullscreen(camera), 'info');
+            }
+        }
+
+        /**
+         * Tam ekran modalını kapatır.
+         */
+        function closeFullscreen() {
+            const modal = document.getElementById('fullscreenModal');
+            if (modal) { // Null kontrolü eklendi
+                modal.classList.remove('show');
+            }
+        }
+
+        // Kamera düzeni değişikliği için olay dinleyici
+        document.getElementById('cameraLayout').addEventListener('change', function() {
+            const layout = this.value;
+            const grid = document.getElementById('cameraGrid');
+            
+            if (grid) { // Null kontrolü eklendi
+                // Seçime göre ızgara düzenini ayarla
+                switch(layout) {
+                    case 'single':
+                        grid.style.gridTemplateColumns = '1fr';
+                        // Etkin olmayan kameraları gizle, sadece ilkini göster
+                        document.querySelectorAll('.camera-stream').forEach((stream, index) => {
+                            if (stream) stream.style.display = index === 0 ? 'flex' : 'none'; // Dahili düzeni korumak için flex kullanın
+                        });
+                        break;
+                    case 'pip':
+                        grid.style.gridTemplateColumns = '2fr 1fr';
+                        document.querySelectorAll('.camera-stream').forEach(stream => {
+                            if (stream) stream.style.display = 'flex';
+                        });
+                        break;
+                    default: // 'grid'
+                        grid.style.gridTemplateColumns = 'repeat(auto-fit, minmax(280px, 1fr));';
+                        document.querySelectorAll('.camera-stream').forEach(stream => {
+                            if (stream) stream.style.display = 'flex';
+                        });
+                }
+                showNotification(translations[currentLanguage].notificationLayoutChanged(translations[currentLanguage][`${layout}Layout`]), 'info');
+            }
+        });
+
+        // Kamera akışını etkinleştirmek için tıklama işleyici
+        document.querySelectorAll('.camera-stream').forEach(stream => {
+            stream.addEventListener('click', function(e) {
+                // Akışın içindeki bir düğmeye tıklanırsa etkinleştirmeyi engelle
+                if (e.target.closest('.snapshot-btn') || e.target.closest('.fullscreen-btn')) {
+                    return;
+                }
+                document.querySelectorAll('.camera-stream').forEach(s => s.classList.remove('active'));
+                this.classList.add('active');
+                activeCamera = this.dataset.camera;
+            });
+        });
+
+        /**
+         * Geçici bir bildirim mesajı görüntüler.
+         * @param {string} message - Görüntülenecek mesaj.
+         * @param {string} [type='info'] - Bildirim türü ('success', 'error', 'info', 'warning').
+         */
+        function showNotification(message, type = 'info') {
+            const notification = document.createElement('div');
+            notification.className = 'notification'; // Başlangıçta 'show' yok
+            
+            const colors = {
+                success: '#22c55e',
+                error: '#ef4444',
+                info: '#667eea',
+                warning: '#f59e0b'
+            };
+            
+            notification.style.borderLeft = `4px solid ${colors[type]}`;
+            notification.innerHTML = `
+                <div style="display: flex; align-items: center; gap: 0.5rem;">
+                    <span style="font-size: 1.2rem;">${type === 'success' ? '✅' : type === 'error' ? '❌' : type === 'warning' ? '⚠️' : 'ℹ️'}</span>
+                    <span>${message}</span>
+                </div>
+            `;
+            
+            document.body.appendChild(notification);
+            
+            // Animasyon için yeniden akışı zorla
+            void notification.offsetWidth; 
+            notification.classList.add('show');
+            
+            setTimeout(() => {
+                notification.classList.remove('show');
+                setTimeout(() => notification.remove(), 300); // Geçişten sonra kaldır
+            }, 3000);
+        }
+
+        // Gerçek zamanlı kamera verisi güncellemelerini simüle et
+        setInterval(() => {
+            // Aktif akışlar için FPS değerlerini güncelle
+            Object.keys(streams).forEach(camera => {
+                if (streams[camera].active) {
+                    const fpsElement = document.getElementById(`fps-${camera}`);
+                    if (fpsElement) { // Null kontrolü eklendi
+                        const baseFps = streams[camera].fps;
+                        const variation = Math.floor(Math.random() * 4) - 2; // ±2 fps varyasyonu
+                        fpsElement.textContent = Math.max(1, baseFps + variation);
+                    }
+                }
+            });
+        }, 2000);
+
+        // Kamera kontrolleri için klavye kısayolları
+        document.addEventListener('keydown', function(e) {
+            if (e.ctrlKey) {
+                switch(e.key) {
+                    case 's':
+                        e.preventDefault(); // Tarayıcı kaydetme iletişim kutusunu engelle
+                        takeSnapshot();
+                        break;
+                    case 'r':
+                        e.preventDefault(); // Tarayıcı yenilemeyi engelle
+                        toggleRecording();
+                        break;
+                    case 'f':
+                        e.preventDefault(); // Tarayıcı tam ekranı engelle
+                        openFullscreen(activeCamera);
+                        break;
+                }
+            }
+        });
+
+        // Tema Yönetimi
+        /**
+         * Açık ve koyu temalar arasında geçiş yapar.
+         * Tercihi yerel depolamaya kaydeder.
+         */
+        function toggleTheme() {
+            document.body.classList.toggle('dark-theme');
+            const isDark = document.body.classList.contains('dark-theme');
+            localStorage.setItem('theme', isDark ? 'dark' : 'light');
+            updateChartThemes(); // Tema değiştiğinde grafikleri güncelle
+        }
+
+        // Sistem teması değişikliklerini dinle ve özel bir tercih kaydedilmemişse güncelle
+        window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e) => {
+            if (!localStorage.getItem('theme')) {
+                if (e.matches) {
+                    document.body.classList.add('dark-theme');
+                } else {
+                    document.body.classList.remove('dark-theme');
+                }
+                updateChartThemes(); // Tema değiştiğinde grafikleri güncelle
+            }
+        });
+
+        // Gösterim için mock veri
+        const robots = {
+            robot1: {
+                name: 'Explorer-01',
+                status: 'online',
+                battery: 87,
+                position: { x: 12.34, y: -5.67, theta: 45.2 }, // Gerçek robot koordinatları
+                velocity: { linear: 1.2, angular: 0.3 },
+                temperature: 42,
+                system: { cpu: 23, memory: '2.1/8.0', uptime: '2sa 34dk' },
+                mapCoordX: 200, // SVG viewBox koordinatları (800x600)
+                mapCoordY: 150
+            },
+            robot2: {
+                name: 'Mapper-02',
+                status: 'warning',
+                battery: 23,
+                position: { x: 8.91, y: 2.45, theta: -12.8 },
+                velocity: { linear: 0.5, angular: 0.1 },
+                temperature: 38,
+                system: { cpu: 45, memory: '3.2/8.0', uptime: '1sa 12dk' },
+                mapCoordX: 400,
+                mapCoordY: 300
+            },
+            robot3: {
+                name: 'Guard-03',
+                status: 'offline',
+                battery: 0,
+                position: { x: 0, y: 0, theta: 0 },
+                velocity: { linear: 0, angular: 0 },
+                temperature: 25,
+                system: { cpu: 0, memory: '0/8.0', uptime: '0sa 0dk' },
+                mapCoordX: 600,
+                mapCoordY: 200
+            }
+        };
+
+        let selectedRobot = 'robot1'; // Başlangıçta seçili robot
+
+        /**
+         * Robot listesini (HTML öğelerini) günceller.
+         * Mevcut listeyi temizler ve 'robots' nesnesindeki verilere göre yeniden oluşturur.
+         * Ayrıca tıklama olaylarını ve aktif durumu da ayarlar.
+         */
+        function updateRobotList() {
+            const robotListContainer = document.getElementById('robotListContainer');
+            if (!robotListContainer) return;
+
+            robotListContainer.innerHTML = ''; // Mevcut listeyi temizle
+
+            const robotKeys = Object.keys(robots);
+            if (robotKeys.length === 0) {
+                selectedRobot = null; // Robot kalmadıysa seçimi kaldır
+            } else if (!selectedRobot || !robots[selectedRobot]) {
+                selectedRobot = robotKeys[0]; // Eğer seçili robot yoksa veya silindiyse ilkini seç
+            }
+
+            for (const robotId of robotKeys) {
+                const robot = robots[robotId];
+                const robotItem = document.createElement('div');
+                robotItem.classList.add('robot-item');
+                if (robotId === selectedRobot) {
+                    robotItem.classList.add('active');
+                }
+                robotItem.dataset.robot = robotId;
+
+                let statusText = '';
+                let statusClass = '';
+                switch(robot.status) {
+                    case 'online':
+                        statusText = translations[currentLanguage].onlineDotStatus;
+                        statusClass = ''; 
+                        break;
+                    case 'warning':
+                        statusText = translations[currentLanguage].warningDotStatus;
+                        statusClass = 'warning';
+                        break;
+                    case 'offline':
+                        statusText = translations[currentLanguage].offlineDotStatus;
+                        statusClass = 'offline';
+                        break;
+                }
+
+                robotItem.innerHTML = `
+                    <div class="robot-name">${robot.name}</div>
+                    <div class="robot-status">
+                        <div class="status-indicator ${statusClass}"></div>
+                        <span>${statusText}</span>
+                    </div>
+                `;
+                
+                robotItem.addEventListener('click', function() {
+                    document.querySelectorAll('.robot-item').forEach(r => r.classList.remove('active'));
+                    this.classList.add('active');
+                    selectedRobot = this.dataset.robot;
+                    updateRobotData();
+                    updateMarkerVisuals();
+                });
+                robotListContainer.appendChild(robotItem);
+            }
+            updateRobotData(); // Listeyi güncelledikten sonra robot verilerini güncelle
+            updateMarkerVisuals(); // İşaretçileri de güncelle
+        }
+
+        /**
+         * Yeni bir mock robot ekler.
+         * Rastgele bir isim ve başlangıç durumu ile yeni bir robot oluşturur
+         * ve 'robots' nesnesine ekler.
+         */
+        function addRobot() {
+            const newRobotId = `robot${Object.keys(robots).length + 1}`;
+            const newRobotName = `New-Robot-${Object.keys(robots).length + 1}`;
+            const statuses = ['online', 'warning', 'offline'];
+            const randomStatus = statuses[Math.floor(Math.random() * statuses.length)];
+
+            robots[newRobotId] = {
+                name: newRobotName,
+                status: randomStatus,
+                battery: Math.floor(Math.random() * 100),
+                position: { x: Math.random() * 20, y: Math.random() * 10, theta: Math.random() * 360 },
+                velocity: { linear: Math.random() * 2, angular: Math.random() * 0.5 },
+                temperature: Math.floor(Math.random() * 20) + 20,
+                system: { cpu: Math.floor(Math.random() * 80) + 10, memory: `${(Math.random() * 4 + 1).toFixed(1)}/8.0`, uptime: `0sa 0dk` },
+                mapCoordX: Math.floor(Math.random() * 700) + 50,
+                mapCoordY: Math.floor(Math.random() * 500) + 50
+            };
+            selectedRobot = newRobotId; // Yeni eklenen robotu seçili yap
+            updateRobotList(); // Listeyi yeniden çiz
+            showNotification(translations[currentLanguage].notificationRobotAdded(newRobotName), 'success');
+        }
+
+        /**
+         * Seçili robotu 'robots' nesnesinden ve arayüzden siler.
+         * Eğer silinen robot seçili ise, başka bir robotu seçer.
+         */
+        function deleteSelectedRobot() {
+            if (!selectedRobot || Object.keys(robots).length === 0) {
+                showNotification(translations[currentLanguage].notificationNoRobotToDelete, 'warning');
+                return;
+            }
+
+            const robotToDeleteName = robots[selectedRobot].name;
+            delete robots[selectedRobot];
+            showNotification(translations[currentLanguage].notificationRobotDeleted(robotToDeleteName), 'info');
+            updateRobotList(); // Listeyi yeniden çiz ve seçimi güncelle
+        }
+
+        /**
+         * Tüm robot işaretçilerinin görsel konumunu harita üzerinde günceller.
+         */
+        function updateMarkerVisuals() {
+            const mapCanvas = document.getElementById('mapCanvas');
+            if (!mapCanvas) return;
+
+            const mapWidth = mapCanvas.offsetWidth;
+            const mapHeight = mapCanvas.offsetHeight;
+            const viewBoxWidth = 800;
+            const viewBoxHeight = 600;
+
+            // Önce tüm eski işaretçileri kaldır
+            document.querySelectorAll('.robot-marker').forEach(marker => marker.remove());
+
+            for (const robotId in robots) {
+                const robot = robots[robotId];
+                if (robot) {
+                    const markerElement = document.createElement('div');
+                    markerElement.classList.add('robot-marker');
+                    if (robotId === selectedRobot) {
+                        markerElement.classList.add('selected');
+                    }
+                    markerElement.dataset.robot = robotId;
+                    markerElement.style.zIndex = '2'; // SVG'nin üzerinde görünmesini sağlar
+                    markerElement.textContent = '🤖'; // Robot ikonu
+
+                    const markerSize = 30; // .robot-marker CSS'teki sabit genişlik/yükseklik
+                    const pixelX = (robot.mapCoordX / viewBoxWidth) * mapWidth - (markerSize / 2);
+                    const pixelY = (robot.mapCoordY / viewBoxHeight) * mapHeight - (markerSize / 2);
+                    
+                    markerElement.style.left = `${pixelX}px`;
+                    markerElement.style.top = `${pixelY}px`;
+
+                    markerElement.addEventListener('click', function() {
+                        const clickedRobotId = this.dataset.robot;
+                        document.querySelectorAll('.robot-item').forEach(r => r.classList.remove('active'));
+                        
+                        const robotItemElement = document.querySelector(`.robot-item[data-robot="${clickedRobotId}"]`);
+                        if(robotItemElement) { // Null kontrolü eklendi
+                            robotItemElement.classList.add('active');
+                        }
+                        
+                        selectedRobot = clickedRobotId;
+                        updateRobotData();
+                        updateMarkerVisuals(); // İşaretçi seçimini görsel olarak yenilemek için
+                    });
+                    mapCanvas.appendChild(markerElement);
+                }
+            }
+        }
+
+        // Chart.js grafikleri için global değişkenler
+        let batteryChart, cpuUsageChart;
+        const CHART_HISTORY_LENGTH = 20; // Grafikte gösterilecek veri noktası sayısı
+        let batteryHistory = Array(CHART_HISTORY_LENGTH).fill(null);
+        let cpuHistory = Array(CHART_HISTORY_LENGTH).fill(null);
+        let chartLabels = Array(CHART_HISTORY_LENGTH).fill('');
+
+        /**
+         * Başlangıçta Chart.js grafiklerini başlatır.
+         */
+        function initializeCharts() {
+            const batteryCtx = document.getElementById('batteryChart');
+            if (batteryCtx) { // Null kontrolü eklendi
+                batteryChart = new Chart(batteryCtx.getContext('2d'), {
+                    type: 'line',
+                    data: {
+                        labels: chartLabels,
+                        datasets: [{
+                            label: translations[currentLanguage].batteryStatusTitle, // Dil desteği
+                            data: batteryHistory,
+                            borderColor: 'rgb(34, 197, 94)', // Yeşil
+                            backgroundColor: 'rgba(34, 197, 94, 0.2)',
+                            fill: true,
+                            tension: 0.3,
+                            pointRadius: 0 // Noktaları gizle
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        animation: {
+                            duration: 0 // Animasyonu kapat
+                        },
+                        scales: {
+                            x: {
+                                display: false // X eksenini gizle
+                            },
+                            y: {
+                                min: 0,
+                                max: 100,
+                                ticks: {
+                                    callback: function(value) { return value + '%'; },
+                                    color: getComputedStyle(document.body).getPropertyValue('--text-color-primary'), // Dinamik renk
+                                },
+                                grid: {
+                                    color: getComputedStyle(document.body).getPropertyValue('--grid-color') // Dinamik renk
+                                }
+                            }
+                        },
+                        plugins: {
+                            legend: { display: false },
+                            tooltip: { enabled: false } // Tooltip'leri gizle
+                        }
+                    }
+                });
+            }
+
+
+            const cpuCtx = document.getElementById('cpuUsageChart');
+            if (cpuCtx) { // Null kontrolü eklendi
+                cpuUsageChart = new Chart(cpuCtx.getContext('2d'), {
+                    type: 'line',
+                    data: {
+                        labels: chartLabels,
+                        datasets: [{
+                            label: translations[currentLanguage].cpuUsageLabel, // Dil desteği
+                            data: cpuHistory,
+                            borderColor: 'rgb(99, 102, 241)', // Mor
+                            backgroundColor: 'rgba(99, 102, 241, 0.2)',
+                            fill: true,
+                            tension: 0.3,
+                            pointRadius: 0 // Noktaları gizle
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        animation: {
+                            duration: 0
+                        },
+                        scales: {
+                            x: {
+                                display: false
+                            },
+                            y: {
+                                min: 0,
+                                max: 100,
+                                ticks: {
+                                    callback: function(value) { return value + '%'; },
+                                    color: getComputedStyle(document.body).getPropertyValue('--text-color-primary'),
+                                },
+                                grid: {
+                                    color: getComputedStyle(document.body).getPropertyValue('--grid-color')
+                                }
+                            }
+                        },
+                        plugins: {
+                            legend: { display: false },
+                            tooltip: { enabled: false }
+                        }
+                    }
+                });
+            }
+            updateChartThemes(); // Tema renklerini başlangıçta ayarla
+        }
+
+        /**
+         * Tema değiştiğinde grafiklerin renklerini günceller.
+         */
+        function updateChartThemes() {
+            const isDark = document.body.classList.contains('dark-theme');
+            // Root CSS değişkenlerini güncelleyelim
+            document.documentElement.style.setProperty('--text-color-primary', isDark ? '#e2e8f0' : '#333');
+            document.documentElement.style.setProperty('--grid-color', isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)');
+            document.documentElement.style.setProperty('--glass-bg-light', isDark ? 'rgba(255, 255, 255, 0.05)' : 'rgba(255, 255, 255, 0.1)');
+            document.documentElement.style.setProperty('--glass-border-light', isDark ? 'rgba(255, 255, 255, 0.05)' : 'rgba(255, 255, 255, 0.1)');
+            document.documentElement.style.setProperty('--glass-shadow-light', isDark ? 'rgba(0, 0, 0, 0.5)' : 'rgba(0, 0, 0, 0.25)');
+            
+            // Scrollbar değişkenlerini güncelle
+            document.documentElement.style.setProperty('--scrollbar-track-color', isDark ? 'rgba(15, 23, 42, 0.5)' : 'rgba(255, 255, 255, 0.15)');
+            document.documentElement.style.setProperty('--scrollbar-thumb-color', isDark ? 'rgba(96, 165, 250, 0.7)' : 'rgba(102, 126, 234, 0.7)');
+            document.documentElement.style.setProperty('--scrollbar-thumb-hover-color', isDark ? 'rgba(96, 165, 250, 1)' : 'rgba(102, 126, 234, 1)');
+
+            // Glassmorphism Buton değişkenlerini güncelle
+            document.documentElement.style.setProperty('--glass-button-bg-light', isDark ? 'rgba(255, 255, 255, 0.05)' : 'rgba(255, 255, 255, 0.2)');
+            document.documentElement.style.setProperty('--glass-button-border-light', isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(255, 255, 255, 0.4)');
+            document.documentElement.style.setProperty('--glass-button-shadow-light', isDark ? 'rgba(0, 0, 0, 0.3)' : 'rgba(0, 0, 0, 0.1)');
+            // Buton metin rengi değişkenlerini güncelle
+            document.documentElement.style.setProperty('--glass-button-text-light', isDark ? '#e2e8f0' : '#667eea');
+            document.documentElement.style.setProperty('--glass-button-text-dark', isDark ? '#e2e8f0' : '#60a5fa');
+
+
+            // Grafiklerin kendilerini güncelleyelim
+            if (batteryChart) {
+                batteryChart.options.scales.y.ticks.color = getComputedStyle(document.body).getPropertyValue('--text-color-primary');
+                batteryChart.options.scales.y.grid.color = getComputedStyle(document.body).getPropertyValue('--grid-color');
+                batteryChart.data.datasets[0].label = translations[currentLanguage].batteryStatusTitle;
+                batteryChart.update();
+            }
+            if (cpuUsageChart) {
+                cpuUsageChart.options.scales.y.ticks.color = getComputedStyle(document.body).getPropertyValue('--text-color-primary');
+                cpuUsageChart.options.scales.y.grid.color = getComputedStyle(document.body).getPropertyValue('--grid-color');
+                cpuUsageChart.data.datasets[0].label = translations[currentLanguage].cpuUsageLabel;
+                cpuUsageChart.update();
+            }
+        }
+
+        /**
+         * Dashboard görünümünü şu anda seçili olan robotun verileriyle günceller.
+         */
+        function updateRobotData() {
+            const robot = robots[selectedRobot]; 
+            
+            // Tüm güncellenecek öğeleri bir kez alıp, varlıklarını kontrol et
+            const batteryLevelEl = document.getElementById('batteryLevel');
+            const batteryProgressEl = document.getElementById('batteryProgress');
+            const voltageEl = document.getElementById('voltage');
+            const currentEl = document.getElementById('current');
+            const posXEl = document.getElementById('posX');
+            const posYEl = document.getElementById('posY');
+            const posThetaEl = document.getElementById('posTheta');
+            const linearSpeedEl = document.getElementById('linearSpeed');
+            const linearVelEl = document.getElementById('linearVel');
+            const angularVelEl = document.getElementById('angularVel');
+            const temperatureEl = document.getElementById('temperature');
+            const cpuTempEl = document.getElementById('cpuTemp');
+            const gpuTempEl = document.getElementById('gpuTemp');
+            const cpuUsageEl = document.getElementById('cpuUsage');
+            const memUsageEl = document.getElementById('memUsage');
+            const uptimeEl = document.getElementById('uptime');
+
+            if (!robot) {
+                // Seçili robot yoksa veya silindiyse, UI'yı temizle
+                if (batteryLevelEl) batteryLevelEl.textContent = '--%';
+                if (batteryProgressEl) batteryProgressEl.style.width = '0%';
+                if (voltageEl) voltageEl.textContent = '--V'; 
+                if (currentEl) currentEl.textContent = '--A';
+                if (posXEl) posXEl.textContent = '--.--';
+                if (posYEl) posYEl.textContent = '--.--';
+                if (posThetaEl) posThetaEl.textContent = '--.-°';
+                if (linearSpeedEl) linearSpeedEl.textContent = '-- m/s';
+                if (linearVelEl) linearVelEl.textContent = '--.--';
+                if (angularVelEl) angularVelEl.textContent = '--.--';
+                if (temperatureEl) temperatureEl.textContent = '--°C';
+                if (cpuTempEl) cpuTempEl.textContent = '--°C';
+                if (gpuTempEl) gpuTempEl.textContent = '--°C';
+                if (cpuUsageEl) cpuUsageEl.textContent = '--%';
+                if (memUsageEl) memUsageEl.textContent = '--/-- GB';
+                if (uptimeEl) uptimeEl.textContent = '--sa --dk';
+
+                // Grafik geçmişlerini temizle
+                batteryHistory = Array(CHART_HISTORY_LENGTH).fill(null);
+                cpuHistory = Array(CHART_HISTORY_LENGTH).fill(null);
+                chartLabels = Array(CHART_HISTORY_LENGTH).fill('');
+
+                if (batteryChart) {
+                    batteryChart.data.datasets[0].data = batteryHistory;
+                    batteryChart.data.labels = chartLabels;
+                    batteryChart.update();
+                }
+                if (cpuUsageChart) {
+                    cpuUsageChart.data.datasets[0].data = cpuHistory;
+                    cpuUsageChart.data.labels = chartLabels;
+                    cpuUsageChart.update();
+                }
+
+                return;
+            }
+
+            // Batarya Durumu Kartını Güncelle
+            if (batteryLevelEl) batteryLevelEl.textContent = robot.battery.toFixed(0) + '%';
+            if (batteryProgressEl) batteryProgressEl.style.width = robot.battery + '%';
+            if (voltageEl) voltageEl.textContent = '24.3V'; 
+            if (currentEl) currentEl.textContent = '-2.1A';
+            
+            // Konum Kartını Güncelle
+            if (posXEl) posXEl.textContent = robot.position.x.toFixed(2);
+            if (posYEl) posYEl.textContent = robot.position.y.toFixed(2);
+            if (posThetaEl) posThetaEl.textContent = robot.position.theta.toFixed(1) + '°';
+            
+            // Hız Kartını Güncelle
+            if (linearSpeedEl) linearSpeedEl.textContent = parseFloat(robot.velocity.linear).toFixed(1) + ' m/s';
+            if (linearVelEl) linearVelEl.textContent = parseFloat(robot.velocity.linear).toFixed(1);
+            if (angularVelEl) angularVelEl.textContent = parseFloat(robot.velocity.angular).toFixed(1);
+            
+            // Sıcaklık Kartını Güncelle
+            if (temperatureEl) temperatureEl.textContent = robot.temperature.toFixed(0) + '°C';
+            if (cpuTempEl) cpuTempEl.textContent = '38°C';
+            if (gpuTempEl) gpuTempEl.textContent = '45°C';
+            
+            // Sistem Durumu Kartını Güncelle
+            if (cpuUsageEl) cpuUsageEl.textContent = robot.system.cpu.toFixed(0) + '%';
+            if (memUsageEl) memUsageEl.textContent = robot.system.memory + ' GB';
+            if (uptimeEl) uptimeEl.textContent = robot.system.uptime;
+
+            // Chart.js verilerini güncelle
+            // Her döngüde yeni veri ekle ve en eskini kaldır
+            batteryHistory.shift();
+            batteryHistory.push(robot.battery);
+            
+            cpuHistory.shift();
+            cpuHistory.push(robot.system.cpu);
+            
+            // Etiketleri güncelle (basit bir zaman damgası veya sadece boş)
+            chartLabels.shift();
+            chartLabels.push(new Date().toLocaleTimeString()); // Her seferde yeni zaman damgası ekle
+
+            if (batteryChart && cpuUsageChart) {
+                batteryChart.data.datasets[0].data = batteryHistory;
+                batteryChart.data.labels = chartLabels;
+                batteryChart.update();
+
+                cpuUsageChart.data.datasets[0].data = cpuHistory;
+                cpuUsageChart.data.labels = chartLabels;
+                cpuUsageChart.update();
+            }
+        }
+
+        // Robot verileri için gerçek zamanlı güncellemeleri simüle et
+        setInterval(() => {
+            // Sadece seçili robotun verilerini güncelle, diğerlerini pas geç
+            if (selectedRobot && robots[selectedRobot]) {
+                const robot = robots[selectedRobot];
+                robot.battery = Math.max(0, robot.battery - 0.05); // Daha yavaş boşalma
+                
+                // Robot için dairesel hareket hesaplaması
+                const time = Date.now() * 0.001; // Saniye cinsinden zaman
+                const centerX = 300; // viewBox'a göre
+                const centerY = 250; // viewBox'a göre
+                const radius = 80; // viewBox'a göre
+                
+                robot.mapCoordX = (centerX + Math.cos(time) * radius);
+                robot.mapCoordY = (centerY + Math.sin(time) * radius);
+                
+                robot.velocity.linear = (1.0 + Math.sin(time) * 0.5);
+                robot.velocity.angular = (Math.cos(time) * 0.2);
+                
+                robot.position.x = (12 + Math.cos(time) * 5);
+                robot.position.y = (-5 + Math.sin(time) * 3);
+                robot.position.theta = (time * 57.3) % 360; // Dereceye dönüştür (yaklaşık)
+                
+                robot.system.cpu = Math.min(100, 20 + Math.sin(time * 0.5) * 15 + Math.random() * 10);
+                
+                updateRobotData(); // Görüntülenen metin verilerini yenile
+                updateMarkerVisuals(); // Tüm işaretçilerin görsel konumlarını yenile
+            } else {
+                updateRobotData(); // Seçili robot yoksa UI'yı temizle
+            }
+        }, 1000); // Her saniyede bir güncelleme
+
+        /**
+         * Verilen bir HTML öğesinin etkileşimli bir öğe (buton, link, select vb.) olup olmadığını kontrol eder.
+         * Tıklanan öğeden başlayarak DOM ağacında yukarı doğru ilerleyerek ebeveynleri de kontrol eder.
+         * Bu, sürükle-bırak olaylarının yanlışlıkla etkileşimli öğeleri tetiklemesini önlemek için kullanılır.
+         * @param {HTMLElement} element - Kontrol edilecek HTML öğesi.
+         * @returns {boolean} Öğenin veya bir ebeveyninin etkileşimli bir öğe olup olmadığı.
+         */
+        function isInteractiveElement(element) {
+            // Etkileşimli olarak kabul edilen HTML etiket adları
+            const interactiveTags = ['BUTTON', 'A', 'SELECT', 'INPUT', 'TEXTAREA'];
+            // Etkileşimli olarak kabul edilen CSS sınıfları
+            const interactiveClasses = [
+                'sidebar-action-btn', 'control-btn', 'camera-btn', 'snapshot-btn',
+                'fullscreen-btn', 'theme-toggle', 'nav-item', 'robot-item', 'language-select'
+            ];
+
+            let currentElement = element;
+            while (currentElement && currentElement !== document.body) {
+                // Etiketi kontrol et
+                if (interactiveTags.includes(currentElement.tagName)) {
+                    return true;
+                }
+                // Sınıfları kontrol et
+                for (const cls of interactiveClasses) {
+                    if (currentElement.classList.contains(cls)) {
+                        return true;
+                    }
+                }
+                currentElement = currentElement.parentElement; // Bir üst ebeveyne geç
+            }
+            return false;
+        }
+
+        // --- Sürükle ve Bırak İşlevselliği ---
+        let draggedItem = null; // Sürüklenen öğeyi saklar
+
+        // Sadece sağ kenar çubuğundaki `.status-card` öğelerini seç
+        const draggableCards = document.querySelectorAll('.right-sidebar .status-card');
+
+        draggableCards.forEach(card => {
+            card.addEventListener('dragstart', (e) => {
+                // Eğer tıklanan öğe veya ebeveynlerinden biri etkileşimli bir öğeyse, sürüklemeyi engelle
+                if (isInteractiveElement(e.target)) {
+                    e.preventDefault(); // Sürükleme işlemini iptal et
+                    e.stopPropagation(); // Olayın daha fazla yayılmasını engelle
+                    return;
+                }
+                draggedItem = e.target;
+                e.target.classList.add('dragging'); // Sürüklü öğeye sınıf ekle
+                // Özel sürükleme görüntüsü ayarla (isteğe bağlı, genellikle tarayıcı varsayılanı yeterlidir)
+                // e.dataTransfer.setDragImage(e.target, e.offsetX, e.offsetY);
+            });
+
+            card.addEventListener('dragend', (e) => {
+                if (draggedItem) {
+                    draggedItem.classList.remove('dragging');
+                    draggedItem = null;
+                }
+            });
+        });
+
+        // Main container veya kartların ebeveyni üzerinde dragover olay dinleyici
+        // Bu, sürükleme sırasında öğelerin yeniden sıralanmasını sağlar
+        document.querySelector('.main-container').addEventListener('dragover', (e) => {
+            e.preventDefault(); // Bırakmaya izin ver
+            if (draggedItem && draggedItem.classList.contains('status-card')) { // Sadece kartları sürükle
+                const container = draggedItem.parentElement; // Sürüklenen öğenin mevcut ebeveynini kullan
+                if (container && container.classList.contains('right-sidebar')) {
+                    // Sadece sağ kenar çubuğundaki kartları yeniden sırala
+                    const afterElement = getDragAfterElement(container, e.clientY);
+                    if (afterElement == null) {
+                        container.appendChild(draggedItem);
+                    } else {
+                        container.insertBefore(draggedItem, afterElement);
+                    }
+                }
+            }
+        });
+
+        document.querySelector('.main-container').addEventListener('drop', (e) => {
+            e.preventDefault();
+            if (draggedItem) {
+                draggedItem.classList.remove('dragging');
+                draggedItem = null; // Sürüklü öğeyi sıfırla
+            }
+        });
+
+        /**
+         * Sürüklenen öğenin fare Y konumuna göre nereye ekleneceğini belirler.
+         * Fareye en yakın olan ve sürüklenen öğe olmayan öğeyi bulur.
+         * @param {HTMLElement} container - Öğelerin sürüklendiği konteyner.
+         * @param {number} y - Farenin clientY koordinatı.
+         * @returns {HTMLElement|null} Önüne eklenecek öğe veya en sondaysa null.
+         */
+        function getDragAfterElement(container, y) {
+            // Konteyner içindeki sürüklenmeyen tüm öğeleri al
+            const draggableElements = [...container.querySelectorAll('.status-card:not(.dragging)')];
+
+            return draggableElements.reduce((closest, child) => {
+                const box = child.getBoundingClientRect();
+                const offset = y - box.top - box.height / 2; // Çocuğun merkezinden uzaklığı hesapla
+                // Ofset negatifse ve mevcut en yakın olandan daha yakınsa, bu, önüne eklenecek öğedir
+                if (offset < 0 && offset > closest.offset) {
+                    return { offset: offset, element: child };
+                } else {
+                    return closest;
+                }
+            }, { offset: Number.NEGATIVE_INFINITY }).element; // Çok küçük bir ofsetle başlat
+        }
+
+        // --- GEMINI API ENTEGRASYONU ---
+
+        /**
+         * Seçili robotun mevcut durumunu analiz etmek için Gemini API'yi çağırır.
+         * Analiz sonucunu bir modal pencerede gösterir.
+         */
+        async function analyzeRobotStatus() {
+            const robot = robots[selectedRobot];
+            if (!robot) {
+                showNotification(translations[currentLanguage].notificationNoRobotForAnalysis, 'warning');
+                return;
+            }
+
+            const modalOverlay = document.getElementById('analysisModalOverlay');
+            const analysisResultDiv = document.getElementById('analysisResult');
+            const analysisSpinner = document.getElementById('analysisSpinner');
+
+            if (modalOverlay && analysisResultDiv && analysisSpinner) { // Tüm elemanların var olduğunu kontrol et
+                // Modalı göster ve spinner'ı aktif et
+                analysisResultDiv.textContent = ''; // Önceki analizi temizle
+                analysisSpinner.style.display = 'block';
+                modalOverlay.classList.add('show');
+            }
+
+
+            const prompt = `
+            ${translations[currentLanguage].analysisPromptPrefix}
+            - ${translations[currentLanguage].robotNameLabel}: ${robot.name}
+            - ${translations[currentLanguage].generalStatusLabel}: ${robot.status}
+            - ${translations[currentLanguage].batteryPercentageLabel}: ${robot.battery.toFixed(0)}%
+            - ${translations[currentLanguage].positionLabel} (X, Y, Theta): (${robot.position.x.toFixed(2)}m, ${robot.position.y.toFixed(2)}m, ${robot.position.theta.toFixed(1)}°)
+            - ${translations[currentLanguage].linearSpeedLabel}: ${robot.velocity.linear.toFixed(1)} m/s
+            - ${translations[currentLanguage].angularSpeedLabel}: ${robot.velocity.angular.toFixed(1)} rad/s
+            - ${translations[currentLanguage].temperatureLabel}: ${robot.temperature.toFixed(0)}°C
+            - ${translations[currentLanguage].cpuUsageLabel}: ${robot.system.cpu.toFixed(0)}%
+            - ${translations[currentLanguage].memoryUsageLabel}: ${robot.system.memory} GB
+            - ${translations[currentLanguage].uptimeLabel}: ${robot.system.uptime}
+
+            ${translations[currentLanguage].analysisPromptSuffix}
+            `;
+
+            let chatHistory = [];
+            chatHistory.push({ role: "user", parts: [{ text: prompt }] });
+            const payload = { contents: chatHistory };
+            const apiKey = ""; // API anahtarı Canvas tarafından sağlanacaktır
+            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${apiKey}`;
+
+            try {
+                const response = await fetch(apiUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                const result = await response.json();
+                
+                if (result.candidates && result.candidates.length > 0 &&
+                    result.candidates[0].content && result.candidates[0].content.parts &&
+                    result.candidates[0].content.parts.length > 0) {
+                    const analysisText = result.candidates[0].content.parts[0].text;
+                    if (analysisResultDiv) analysisResultDiv.textContent = analysisText; // Null kontrolü eklendi
+                } else {
+                    if (analysisResultDiv) analysisResultDiv.textContent = translations[currentLanguage].analysisErrorApi; // Null kontrolü eklendi
+                    console.error('Gemini API yanıt yapısı beklenmedik:', result);
+                }
+            } catch (error) {
+                if (analysisResultDiv) analysisResultDiv.textContent = translations[currentLanguage].analysisErrorNetwork; // Null kontrolü eklendi
+                console.error('Gemini API çağrısı sırasında hata:', error);
+            } finally {
+                if (analysisSpinner) analysisSpinner.style.display = 'none'; // Spinner'ı gizle // Null kontrolü eklendi
+            }
+        }
+
+        // Gemini API prompt için ek çeviri anahtarları
+        translations.en.analysisPromptPrefix = 'The current status of the selected robot is as follows:';
+        translations.en.analysisPromptSuffix = 'Based on this data, provide a brief analysis of the robot\'s current status and suggest possible solutions if there is a problem. Provide the answer as plain text formatted in English.';
+        translations.en.robotNameLabel = 'Name';
+        translations.en.generalStatusLabel = 'General Status';
+        translations.en.batteryPercentageLabel = 'Battery Percentage';
+        translations.en.positionLabel = 'Position';
+        translations.en.linearSpeedLabel = 'Linear Speed';
+        translations.en.angularSpeedLabel = 'Angular Speed';
+        translations.en.temperatureLabel = 'Temperature';
+        translations.en.cpuUsageLabel = 'CPU Usage';
+        translations.en.memoryUsageLabel = 'Memory Usage';
+        translations.en.uptimeLabel = 'Uptime';
+
+        translations.tr.analysisPromptPrefix = 'Şu anda seçili robotun durumu şöyledir:';
+        translations.tr.analysisPromptSuffix = 'Bu verilere dayanarak, robotun mevcut durumu hakkında kısa bir analiz yap ve eğer bir sorun varsa olası çözüm önerileri sun. Yanıtı Türkçe olarak biçimlendirilmiş düz metin olarak ver.';
+        translations.tr.robotNameLabel = 'Adı';
+        translations.tr.generalStatusLabel = 'Genel Durum';
+        translations.tr.batteryPercentageLabel = 'Batarya Yüzdesi';
+        translations.tr.positionLabel = 'Konum';
+        translations.tr.linearSpeedLabel = 'Doğrusal Hız';
+        translations.tr.angularSpeedLabel = 'Açısal Hız';
+        translations.tr.temperatureLabel = 'Sıcaklık';
+        translations.tr.cpuUsageLabel = 'CPU Kullanımı';
+        translations.tr.memoryUsageLabel = 'Bellek Kullanımı';
+        translations.tr.uptimeLabel = 'Çalışma Süresi';
+
+        /**
+         * Analiz modalını kapatır.
+         */
+        function closeAnalysisModal() {
+            const modalOverlay = document.getElementById('analysisModalOverlay');
+            if (modalOverlay) { // Null kontrolü eklendi
+                modalOverlay.classList.remove('show');
+                document.body.style.overflow = ''; // Sayfa kaydırmasını geri aç
+            }
+        }
+
+        // Sayfa yüklendiğinde dashboard'u başlat
+        initSettings(); // Tema ve dil ayarlarını başlat
+        initializeCharts(); // Grafikleri başlat
+        updateRobotList(); // Başlangıçta robot listesini yükle
+        
+        // Pencere yeniden boyutlandırıldığında işaretçileri ve grafikleri güncelle
+        window.addEventListener('resize', () => {
+            updateMarkerVisuals();
+            if (batteryChart) batteryChart.resize();
+            if (cpuUsageChart) cpuUsageChart.resize();
+        });
+
+        console.log('Dashboard mock verileri, sürükle-bırak işlevselliği, grafikler ve robot ekleme/silme ile başlatıldı. ROS2 entegrasyonu için hazır!');
+    </script>
+</body>
+</html>
