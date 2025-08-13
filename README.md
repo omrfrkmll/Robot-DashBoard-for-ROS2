@@ -75,7 +75,7 @@ You can add screenshots of your project or a link to a short demo video here.
 
 - Screenshot 1: Main Dashboard View
 
-[Main Dashboard](images/dashboard.png)
+![Main Dashboard](images/dashboard.png)
 
 - Screenshot 2: Analysis Modal Example
 
