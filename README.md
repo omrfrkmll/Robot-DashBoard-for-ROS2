@@ -118,7 +118,7 @@ To run the project on your local machine or a ROS2-enabled system (e.g., Jetson 
 First, download the project's GitHub repository to your computer:
 
 ```bash
-git clone [https://github.com/omrfrkmll/Robot-DashBoard-for-ROS2.git](https://github.com/omrfrkmll/Robot-DashBoard-for-ROS2.git)
+git clone https://github.com/omrfrkmll/Robot-DashBoard-for-ROS2.git
 cd Robot-DashBoard-for-ROS2
 ```
 
